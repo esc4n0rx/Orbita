@@ -1,0 +1,111 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useToast } from "@/hooks/use-toast"
+import { Loader2 } from "lucide-react"
+
+export function LoginForm() {
+  const router = useRouter()
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    rememberMe: false,
+  })
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleCheckboxChange = (checked: boolean) => {
+    setFormData((prev) => ({ ...prev, rememberMe: checked }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    try {
+      // Simulando um login
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      // Normalmente aqui teria uma chamada de API para autenticar o usuário
+
+      toast({
+        title: "Login realizado com sucesso!",
+        description: "Redirecionando para o dashboard...",
+      })
+
+      router.push("/dashboard")
+    } catch (error) {
+      toast({
+        title: "Erro ao fazer login",
+        description: "Verifique suas credenciais e tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          placeholder="seu@email.com"
+          required
+          value={formData.email}
+          onChange={handleChange}
+          className="border-slate-800 bg-slate-950/50"
+        />
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Senha</Label>
+          <Button variant="link" className="h-auto p-0 text-xs text-cyan-400" asChild>
+            <a href="/forgot-password">Esqueceu a senha?</a>
+          </Button>
+        </div>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          placeholder="••••••••"
+          required
+          value={formData.password}
+          onChange={handleChange}
+          className="border-slate-800 bg-slate-950/50"
+        />
+      </div>
+      <div className="flex items-center space-x-2">
+        <Checkbox id="remember-me" checked={formData.rememberMe} onCheckedChange={handleCheckboxChange} />
+        <Label htmlFor="remember-me" className="text-sm">
+          Lembrar de mim
+        </Label>
+      </div>
+      <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Entrando...
+          </>
+        ) : (
+          "Entrar"
+        )}
+      </Button>
+    </form>
+  )
+}
