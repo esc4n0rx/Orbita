@@ -1,18 +1,9 @@
+// app/middleware.ts (atualizado)
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { auth as firebaseAuth } from '@/lib/firebase-admin'; // Precisamos criar esta biblioteca também
 
 export async function middleware(request: NextRequest) {
-  // Criar cliente Supabase para verificar a sessão
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-    {
-      auth: {
-        persistSession: false,
-      },
-    }
-  );
-
   // Lista de rotas que não precisam de autenticação
   const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/auth/callback'];
   const isPublicRoute = publicRoutes.some(route => 
@@ -25,12 +16,42 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // Verificar se temos um cookie de sessão
-    const { data: { session } } = await supabase.auth.getSession();
+    // Verificar qual o provedor está sendo usado (Firebase ou Supabase)
+    const authProvider = request.cookies.get('auth_provider')?.value || 'firebase';
+    
+    if (authProvider === 'supabase') {
+      // Criar cliente Supabase para verificar a sessão
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+        {
+          auth: {
+            persistSession: false,
+          },
+        }
+      );
+      
+      // Verificar se temos um cookie de sessão no Supabase
+      const { data: { session } } = await supabase.auth.getSession();
 
-    // Redirecionar para a página inicial se não estiver autenticado
-    if (!session) {
-      return NextResponse.redirect(new URL('/', request.url));
+      // Redirecionar para a página inicial se não estiver autenticado
+      if (!session) {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+    } else {
+      // Verificar token do Firebase
+      const authHeader = request.headers.get('authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+      
+      const token = authHeader.split('Bearer ')[1];
+      try {
+        // Verificar token com Firebase Admin
+        await firebaseAuth.verifyIdToken(token);
+      } catch (error) {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
     }
   } catch (error) {
     // Em caso de erro, redirecionar para a página inicial

@@ -1,3 +1,4 @@
+// components/register-form.tsx (atualizado)
 "use client"
 
 import type React from "react"
@@ -7,14 +8,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
-import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context";
+import { FcGoogle } from "react-icons/fc";
 
 export function RegisterForm() {
   const router = useRouter();
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, signUpWithEmail, activeProvider } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -44,7 +45,12 @@ export function RegisterForm() {
     try {
       const { error } = await signInWithGoogle();
       if (error) throw error;
-      // Não precisamos navegar aqui pois o callback OAuth vai lidar com isso
+      
+      // No caso do Firebase, redirecionamos manualmente
+      if (activeProvider === 'firebase') {
+        router.push('/dashboard');
+      }
+      // No caso do Supabase, o redirecionamento é feito pelo callback
     } catch (error) {
       console.error("Erro ao registrar com Google:", error);
       toast({
@@ -93,19 +99,14 @@ export function RegisterForm() {
     setLoading(true);
     
     try {
-      // Registro com Supabase
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            nome: formData.name,
-          },
-        },
-      });
+      const { data, error } = await signUpWithEmail(
+        formData.email, 
+        formData.password, 
+        formData.name
+      );
       
       if (error) {
-        throw new Error(error.message);
+        throw error;
       }
       
       toast({
@@ -205,6 +206,7 @@ export function RegisterForm() {
         onClick={handleGoogleRegister}
         disabled={loading}
       >
+        <FcGoogle className="mr-2 h-4 w-4" />
         Google
       </Button>
     </form>

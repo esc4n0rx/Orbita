@@ -1,3 +1,4 @@
+// components/login-form.tsx (atualizado)
 "use client"
 
 import type React from "react"
@@ -8,16 +9,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2 } from "lucide-react"
-import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context";
 import { FcGoogle } from "react-icons/fc";
 
-
 export function LoginForm() {
   const router = useRouter();
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, signInWithEmail, activeProvider } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -36,20 +35,26 @@ export function LoginForm() {
   }
 
   const handleGoogleLogin = async () => {
-  setLoading(true);
-  try {
-    const { error } = await signInWithGoogle();
-    if (error) throw error;
-  } catch (error) {
-    console.error("Erro ao fazer login com Google:", error);
-    toast({
-      title: "Erro ao fazer login com Google",
-      description: error instanceof Error ? error.message : "Ocorreu um erro durante a autenticação.",
-      variant: "destructive",
-    });
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) throw error;
+      
+      // No caso do Firebase, redirecionamos manualmente pois a resposta é síncrona
+      if (activeProvider === 'firebase') {
+        router.push('/dashboard');
+      }
+      // No caso do Supabase, o redirecionamento é feito pelo callback
+    } catch (error) {
+      console.error("Erro ao fazer login com Google:", error);
+      toast({
+        title: "Erro ao fazer login com Google",
+        description: error instanceof Error ? error.message : "Ocorreu um erro durante a autenticação.",
+        variant: "destructive",
+      });
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,14 +62,10 @@ export function LoginForm() {
     setLoading(true);
     
     try {
-      // Login com Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+      const { data, error } = await signInWithEmail(formData.email, formData.password);
       
       if (error) {
-        throw new Error(error.message);
+        throw error;
       }
       
       toast({

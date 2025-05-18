@@ -1,3 +1,4 @@
+// components/user-nav.tsx (atualizado)
 "use client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -12,68 +13,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Bell, LogOut, Settings, User } from "lucide-react"
-import { useState, useEffect } from "react"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-
-type UserDetails = {
-  id: string;
-  nome: string;
-  email: string;
-  bio: string | null;
-  avatar_url: string | null;
-};
+import { useAuth } from "@/contexts/auth-context"
+import { useState } from "react"
 
 export function UserNav() {
-  const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
+  const { user, userDetails, loading, signOut, activeProvider } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Obter usuário atual
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          setUserDetails(null);
-          return;
-        }
-        
-        // Buscar detalhes do perfil
-        const { data } = await supabase
-          .from('orbita_usuarios')
-          .select('id, nome, email, bio, avatar_url')
-          .eq('id', user.id)
-          .single();
-        
-        if (data) {
-          setUserDetails(data as UserDetails);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar dados do usuário:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchUserData();
-  }, []);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        throw error;
-      }
+      await signOut();
       
       toast({
         title: "Logout realizado com sucesso!",
@@ -127,6 +82,9 @@ export function UserNav() {
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium leading-none">{userDetails?.nome || "Usuário"}</p>
               <p className="text-xs leading-none text-muted-foreground">{userDetails?.email || "usuário@exemplo.com"}</p>
+              <p className="text-xs text-muted-foreground">
+                Usando: {activeProvider === 'firebase' ? 'Firebase' : 'Supabase'}
+              </p>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -147,7 +105,7 @@ export function UserNav() {
           <DropdownMenuSeparator />
           <DropdownMenuItem 
             onClick={handleLogout}
-            disabled={isLoggingOut || isLoading}
+            disabled={isLoggingOut || loading}
           >
             <LogOut className="mr-2 h-4 w-4" />
             <span>{isLoggingOut ? "Saindo..." : "Sair"}</span>

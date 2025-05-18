@@ -1,3 +1,4 @@
+// app/auth-page.tsx (modificado)
 "use client";
 
 import Link from "next/link"
@@ -8,13 +9,14 @@ import { LoginForm } from "@/components/login-form"
 import { RegisterForm } from "@/components/register-form"
 import { Star } from "lucide-react"
 import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context";
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 
 export default function AuthPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, activeProvider, switchProvider } = useAuth();
 
   useEffect(() => {
     // Redirecionar para o dashboard se o usuário já estiver autenticado
@@ -61,26 +63,19 @@ export default function AuthPage() {
                 <CardDescription>Entre com sua conta para acessar o sistema</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2 mb-4">
+                  <Label htmlFor="auth-provider">Usar Firebase</Label>
+                  <Switch 
+                    id="auth-provider" 
+                    checked={activeProvider === 'firebase'}
+                    onCheckedChange={(checked) => switchProvider(checked ? 'firebase' : 'supabase')}
+                  />
+                  <span className="text-xs text-slate-400">
+                    {activeProvider === 'firebase' ? 'Firebase' : 'Supabase'}
+                  </span>
+                </div>
                 <LoginForm />
               </CardContent>
-              <CardFooter className="flex flex-col space-y-4">
-                {/* <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-slate-800" />
-                  </div>
-                  <div className="relative flex justify-center text-xs">
-                    <span className="bg-slate-900 px-2 text-slate-400">Ou continue com</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" className="border-slate-800 bg-slate-950/50 hover:bg-slate-900">
-                    Google
-                  </Button>
-                  <Button variant="outline" className="border-slate-800 bg-slate-950/50 hover:bg-slate-900">
-                    GitHub
-                  </Button>
-                </div> */}
-              </CardFooter>
             </TabsContent>
             <TabsContent value="register">
               <CardHeader>
@@ -88,26 +83,19 @@ export default function AuthPage() {
                 <CardDescription>Preencha os dados abaixo para se cadastrar</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2 mb-4">
+                  <Label htmlFor="auth-provider-register">Usar Firebase</Label>
+                  <Switch 
+                    id="auth-provider-register" 
+                    checked={activeProvider === 'firebase'}
+                    onCheckedChange={(checked) => switchProvider(checked ? 'firebase' : 'supabase')}
+                  />
+                  <span className="text-xs text-slate-400">
+                    {activeProvider === 'firebase' ? 'Firebase' : 'Supabase'}
+                  </span>
+                </div>
                 <RegisterForm />
               </CardContent>
-              <CardFooter className="flex flex-col space-y-4">
-                {/* <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-slate-800" />
-                  </div>
-                  <div className="relative flex justify-center text-xs">
-                    <span className="bg-slate-900 px-2 text-slate-400">Ou continue com</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" className="border-slate-800 bg-slate-950/50 hover:bg-slate-900">
-                    Google
-                  </Button>
-                  <Button variant="outline" className="border-slate-800 bg-slate-950/50 hover:bg-slate-900">
-                    GitHub
-                  </Button>
-                </div> */}
-              </CardFooter>
             </TabsContent>
           </Tabs>
         </Card>
