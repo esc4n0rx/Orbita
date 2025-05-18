@@ -1,6 +1,11 @@
+"use client"
+
 import type React from "react"
+import { useState, useEffect } from "react"
 import { MobileNav } from "@/components/mobile-nav"
 import { UserNav } from "@/components/user-nav"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -9,6 +14,9 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, showHeader = true, title }: AppLayoutProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+
   return (
     <div className="flex min-h-screen flex-col pb-16">
       {showHeader && (

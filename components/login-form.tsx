@@ -3,18 +3,19 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 
 export function LoginForm() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -31,29 +32,36 @@ export function LoginForm() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-
+    e.preventDefault();
+    
+    setLoading(true);
+    
     try {
-      // Simulando um login
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Normalmente aqui teria uma chamada de API para autenticar o usuário
-
+      // Login com Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
       toast({
         title: "Login realizado com sucesso!",
         description: "Redirecionando para o dashboard...",
-      })
-
-      router.push("/dashboard")
+      });
+      
+      router.push('/dashboard');
     } catch (error) {
+      console.error("Erro ao fazer login:", error);
       toast({
         title: "Erro ao fazer login",
-        description: "Verifique suas credenciais e tente novamente.",
+        description: error instanceof Error ? error.message : "Verifique suas credenciais e tente novamente.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setLoading(false);
     }
   }
 
@@ -70,6 +78,7 @@ export function LoginForm() {
           value={formData.email}
           onChange={handleChange}
           className="border-slate-800 bg-slate-950/50"
+          disabled={loading}
         />
       </div>
       <div className="space-y-2">
@@ -88,16 +97,22 @@ export function LoginForm() {
           value={formData.password}
           onChange={handleChange}
           className="border-slate-800 bg-slate-950/50"
+          disabled={loading}
         />
       </div>
       <div className="flex items-center space-x-2">
-        <Checkbox id="remember-me" checked={formData.rememberMe} onCheckedChange={handleCheckboxChange} />
+        <Checkbox 
+          id="remember-me" 
+          checked={formData.rememberMe} 
+          onCheckedChange={handleCheckboxChange}
+          disabled={loading}
+        />
         <Label htmlFor="remember-me" className="text-sm">
           Lembrar de mim
         </Label>
       </div>
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? (
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Entrando...

@@ -3,17 +3,18 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 
 export function RegisterForm() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -70,28 +71,39 @@ export function RegisterForm() {
       return
     }
 
-    setIsLoading(true)
-
+    setLoading(true);
+    
     try {
-      // Simulando um registro
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Normalmente aqui teria uma chamada de API para registrar o usuário
-
+      // Registro com Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            nome: formData.name,
+          },
+        },
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
       toast({
         title: "Conta criada com sucesso!",
         description: "Redirecionando para o dashboard...",
-      })
-
-      router.push("/dashboard")
+      });
+      
+      router.push('/dashboard');
     } catch (error) {
+      console.error("Erro ao criar conta:", error);
       toast({
         title: "Erro ao criar conta",
-        description: "Ocorreu um erro ao criar sua conta. Tente novamente.",
+        description: error instanceof Error ? error.message : "Ocorreu um erro ao criar sua conta. Tente novamente.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setLoading(false);
     }
   }
 
@@ -108,6 +120,7 @@ export function RegisterForm() {
           value={formData.name}
           onChange={handleChange}
           className={`border-slate-800 bg-slate-950/50 ${errors.name ? "border-red-500" : ""}`}
+          disabled={loading}
         />
         {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
       </div>
@@ -122,6 +135,7 @@ export function RegisterForm() {
           value={formData.email}
           onChange={handleChange}
           className={`border-slate-800 bg-slate-950/50 ${errors.email ? "border-red-500" : ""}`}
+          disabled={loading}
         />
         {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
       </div>
@@ -136,6 +150,7 @@ export function RegisterForm() {
           value={formData.password}
           onChange={handleChange}
           className={`border-slate-800 bg-slate-950/50 ${errors.password ? "border-red-500" : ""}`}
+          disabled={loading}
         />
         {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
       </div>
@@ -150,11 +165,12 @@ export function RegisterForm() {
           value={formData.confirmPassword}
           onChange={handleChange}
           className={`border-slate-800 bg-slate-950/50 ${errors.confirmPassword ? "border-red-500" : ""}`}
+          disabled={loading}
         />
         {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword}</p>}
       </div>
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? (
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Criando conta...
