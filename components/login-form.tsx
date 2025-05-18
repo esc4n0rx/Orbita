@@ -11,9 +11,13 @@ import { Loader2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context";
+import { FcGoogle } from "react-icons/fc";
+
 
 export function LoginForm() {
   const router = useRouter();
+  const { signInWithGoogle } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -30,6 +34,22 @@ export function LoginForm() {
   const handleCheckboxChange = (checked: boolean) => {
     setFormData((prev) => ({ ...prev, rememberMe: checked }))
   }
+
+  const handleGoogleLogin = async () => {
+  setLoading(true);
+  try {
+    const { error } = await signInWithGoogle();
+    if (error) throw error;
+  } catch (error) {
+    console.error("Erro ao fazer login com Google:", error);
+    toast({
+      title: "Erro ao fazer login com Google",
+      description: error instanceof Error ? error.message : "Ocorreu um erro durante a autenticação.",
+      variant: "destructive",
+    });
+    setLoading(false);
+  }
+};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,6 +140,15 @@ export function LoginForm() {
         ) : (
           "Entrar"
         )}
+      </Button>
+      <Button 
+        variant="outline" 
+        className="border-slate-800 bg-slate-950/50 hover:bg-slate-900"
+        onClick={handleGoogleLogin}
+        disabled={loading}
+      >
+        <FcGoogle className="mr-2 h-4 w-4" />
+        Google
       </Button>
     </form>
   )

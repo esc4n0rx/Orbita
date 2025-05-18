@@ -10,9 +10,11 @@ import { Loader2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context";
 
 export function RegisterForm() {
   const router = useRouter();
+  const { signInWithGoogle } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -36,6 +38,23 @@ export function RegisterForm() {
       })
     }
   }
+
+  const handleGoogleRegister = async () => {
+    setLoading(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) throw error;
+      // Não precisamos navegar aqui pois o callback OAuth vai lidar com isso
+    } catch (error) {
+      console.error("Erro ao registrar com Google:", error);
+      toast({
+        title: "Erro ao registrar com Google",
+        description: error instanceof Error ? error.message : "Ocorreu um erro durante a autenticação.",
+        variant: "destructive",
+      });
+      setLoading(false);
+    }
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -178,6 +197,15 @@ export function RegisterForm() {
         ) : (
           "Criar conta"
         )}
+      </Button>
+
+      <Button 
+        variant="outline" 
+        className="border-slate-800 bg-slate-950/50 hover:bg-slate-900"
+        onClick={handleGoogleRegister}
+        disabled={loading}
+      >
+        Google
       </Button>
     </form>
   )

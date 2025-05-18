@@ -14,7 +14,7 @@ export async function middleware(request: NextRequest) {
   );
 
   // Lista de rotas que não precisam de autenticação
-  const publicRoutes = ['/', '/login', '/register', '/forgot-password'];
+  const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/auth/callback'];
   const isPublicRoute = publicRoutes.some(route => 
     request.nextUrl.pathname === route || request.nextUrl.pathname.startsWith('/api/auth')
   );

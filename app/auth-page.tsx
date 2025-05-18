@@ -15,14 +15,14 @@ import { useAuth } from "@/contexts/auth-context";
 export default function AuthPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
-  
+
   useEffect(() => {
     // Redirecionar para o dashboard se o usuário já estiver autenticado
     if (!loading && user) {
       router.push('/dashboard');
     }
   }, [user, loading, router]);
-  
+
   // Mostrar tela de carregamento enquanto verifica a autenticação
   if (loading) {
     return (
@@ -34,7 +34,7 @@ export default function AuthPage() {
       </div>
     );
   }
-  
+
   // Se não estiver autenticado, mostrar página de login/registro
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 p-4">
@@ -64,7 +64,7 @@ export default function AuthPage() {
                 <LoginForm />
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
-                <div className="relative">
+                {/* <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-slate-800" />
                   </div>
@@ -79,7 +79,7 @@ export default function AuthPage() {
                   <Button variant="outline" className="border-slate-800 bg-slate-950/50 hover:bg-slate-900">
                     GitHub
                   </Button>
-                </div>
+                </div> */}
               </CardFooter>
             </TabsContent>
             <TabsContent value="register">
@@ -91,7 +91,7 @@ export default function AuthPage() {
                 <RegisterForm />
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
-                <div className="relative">
+                {/* <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-slate-800" />
                   </div>
@@ -106,7 +106,7 @@ export default function AuthPage() {
                   <Button variant="outline" className="border-slate-800 bg-slate-950/50 hover:bg-slate-900">
                     GitHub
                   </Button>
-                </div>
+                </div> */}
               </CardFooter>
             </TabsContent>
           </Tabs>
