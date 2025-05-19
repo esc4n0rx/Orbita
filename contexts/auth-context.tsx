@@ -1,4 +1,4 @@
-// contexts/auth-context.tsx
+// contexts/auth-context.tsx (versão atualizada)
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -13,6 +13,7 @@ import {
   signOut as firebaseSignOut
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { TokenService } from '@/lib/token-service';
 
 type AuthProvider = 'supabase' | 'firebase';
 
@@ -48,7 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | FirebaseUser | null>(null);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [activeProvider, setActiveProvider] = useState<AuthProvider>('supabase'); // Supabase como padrão fixo
+  const [activeProvider, setActiveProvider] = useState<AuthProvider>(
+    (TokenService.getProvider() as AuthProvider) || 'supabase'
+  );
 
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
@@ -66,62 +69,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         setLoading(true);
         
-        if (activeProvider === 'supabase') {
-          // Inicializar autenticação do Supabase
-          const { data: { session } } = await supabase.auth.getSession();
-          setSession(session);
-          setUser(session?.user || null);
+        // Verificar se temos um token salvo
+        const savedToken = TokenService.getToken();
+        const savedProvider = TokenService.getProvider() as AuthProvider;
+        
+        if (!savedToken) {
+          setLoading(false);
+          return;
+        }
+        
+        if (savedProvider === 'supabase') {
+          // Usar token salvo para reestabelecer sessão
+          const { data, error } = await supabase.auth.getUser(savedToken);
           
-          if (session?.user) {
-            const { data, error } = await supabase
-              .from('orbita_usuarios')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-            
-            if (data && !error) {
-              setUserDetails({
-                ...data as UserDetails,
-                provider: 'supabase'
-              });
-            }
+          if (error || !data.user) {
+            // Token inválido
+            TokenService.clearAuth();
+            setLoading(false);
+            return;
           }
           
-          // Configurar listener para mudanças na autenticação
-          const { data: { subscription } } = await supabase.auth.onAuthStateChange(
-            async (event, newSession) => {
-              setSession(newSession);
-              setUser(newSession?.user || null);
-              
-              if (newSession?.user) {
-                const { data } = await supabase
-                  .from('orbita_usuarios')
-                  .select('*')
-                  .eq('id', newSession.user.id)
-                  .single();
-                
-                if (data) {
-                  setUserDetails({
-                    ...data as UserDetails,
-                    provider: 'supabase'
-                  });
-                }
-              } else {
-                setUserDetails(null);
-              }
-            }
-          );
+          setUser(data.user);
           
-          setLoading(false);
+          // Buscar detalhes do usuário
+          const { data: userData } = await supabase
+            .from('orbita_usuarios')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
           
-          return () => {
-            subscription.unsubscribe();
-          };
+          if (userData) {
+            setUserDetails({
+              ...userData as UserDetails,
+              provider: 'supabase'
+            });
+          }
+          
+          // Também atualizar a sessão para compatibilidade
+          const { data: sessionData } = await supabase.auth.getSession();
+          setSession(sessionData.session);
         } else {
+          // Firebase - tentar restaurar a sessão
+          // Nota: Firebase já mantém a sessão automaticamente via persistência
           const unsubFirebase = auth.onAuthStateChanged(async (firebaseUser) => {
             setUser(firebaseUser);
             
             if (firebaseUser) {
+              // Atualizar token salvo para manter fresco
+              const freshToken = await firebaseUser.getIdToken();
+              TokenService.setToken(freshToken);
+              
+              // Buscar detalhes do usuário
               const userRef = doc(db, 'orbita_usuarios', firebaseUser.uid);
               const userSnap = await getDoc(userRef);
               
@@ -132,16 +130,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 });
               }
             } else {
+              // Se onAuthStateChanged não retorna usuário, limpar tokens
+              TokenService.clearAuth();
               setUserDetails(null);
             }
             
             setLoading(false);
+            return () => unsubFirebase();
           });
-          
-          return () => unsubFirebase();
         }
       } catch (error) {
         console.error("Erro ao inicializar autenticação:", error);
+        TokenService.clearAuth();
         setLoading(false);
       }
     };
@@ -154,6 +154,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Sempre usa Firebase para login com Google
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      
+      // Salvar token
+      const token = await user.getIdToken();
+      TokenService.setToken(token);
+      TokenService.setProvider('firebase');
+      setActiveProvider('firebase');
 
       const userRef = doc(db, 'orbita_usuarios', user.uid);
       const userSnap = await getDoc(userRef);
@@ -173,9 +179,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await setDoc(userRef, userDetails);
       }
       
-      // Alterar o provedor ativo para Firebase após login com Google
-      setActiveProvider('firebase');
-      
       return { data: { user }, error: null };
     } catch (error) {
       console.error('Erro ao fazer login com Google:', error);
@@ -192,6 +195,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       
       if (error) throw error;
+      
+      // Salvar token
+      if (data.session?.access_token) {
+        TokenService.setToken(data.session.access_token);
+        TokenService.setProvider('supabase');
+        setActiveProvider('supabase');
+      }
+      
+      setUser(data.user);
+      setSession(data.session);
+      
+      // Buscar detalhes do usuário
+      if (data.user) {
+        const { data: userData } = await supabase
+          .from('orbita_usuarios')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (userData) {
+          setUserDetails({
+            ...userData as UserDetails,
+            provider: 'supabase'
+          });
+        }
+      }
       
       return { data, error: null };
     } catch (error) {
@@ -215,6 +244,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (error) throw error;
       
+      // Salvar token
+      if (data.session?.access_token) {
+        TokenService.setToken(data.session.access_token);
+        TokenService.setProvider('supabase');
+        setActiveProvider('supabase');
+      }
+      
+      setUser(data.user);
+      setSession(data.session);
+      
       // Verificar se o usuário foi criado
       if (data.user && data.user.id) {
         // Aguardar um momento para garantir que o usuário foi criado no Auth
@@ -237,6 +276,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
           if (profileError) {
             console.error("Erro ao criar perfil de usuário:", profileError);
+          } else {
+            // Definir detalhes do usuário
+            setUserDetails({
+              id: data.user.id,
+              nome: name,
+              email: data.user.email || '',
+              bio: null,
+              avatar_url: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              provider: 'supabase'
+            });
           }
         } catch (profileError) {
           console.error("Exceção ao criar perfil de usuário:", profileError);
@@ -258,6 +309,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await firebaseSignOut(auth);
       }
       
+      // Limpar dados de autenticação
+      TokenService.clearAuth();
       setUser(null);
       setUserDetails(null);
       setSession(null);
@@ -298,6 +351,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const currentUser = auth.currentUser;
         
         if (currentUser) {
+          // Atualizar token armazenado
+          const freshToken = await currentUser.getIdToken(true); // force refresh
+          TokenService.setToken(freshToken);
+          
           const userRef = doc(db, 'orbita_usuarios', currentUser.uid);
           const userSnap = await getDoc(userRef);
           
@@ -320,6 +377,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Fazer logout antes de trocar de provedor
     signOut().then(() => {
       setActiveProvider(provider);
+      TokenService.setProvider(provider);
     });
   };
 

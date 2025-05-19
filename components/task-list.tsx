@@ -1,4 +1,4 @@
-// components/task-list.tsx
+// components/task-list.tsx (versão completa com ajustes)
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -17,6 +17,8 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { fetchAPI } from "@/lib/api"
+import { useRouter } from "next/navigation"
 
 type Task = {
   id: string
@@ -45,292 +47,20 @@ function formatarData(dataStr: string): string {
   }
 }
 
-export function TaskList({
-  expanded = false,
-  filterStatus,
-  selectedDate,
-  filterCategoryId,
-  filterTagId,
-  onTaskUpdate,
-}: { 
-  expanded?: boolean; 
-  filterStatus?: "pendente" | "concluida" | "recorrente";
-  selectedDate?: Date;
-  filterCategoryId?: string;
-  filterTagId?: string;
-  onTaskUpdate?: () => void;
+// Componente separado para a lista de tarefas
+function TaskListContent({
+  displayTasks,
+  toggleTaskCompletion,
+  handleAdiarTarefa,
+  handleDuplicarTarefa,
+  handleRemoverTarefa,
+}: {
+  displayTasks: Task[];
+  toggleTaskCompletion: (id: string) => Promise<void>;
+  handleAdiarTarefa: (id: string) => Promise<void>;
+  handleDuplicarTarefa: (id: string) => Promise<void>;
+  handleRemoverTarefa: (id: string) => Promise<void>;
 }) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-
-  // Usar useCallback para evitar recriação da função a cada render
-  const fetchTasks = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Construir URL com parâmetros
-      let url = '/api/tarefas?';
-      
-      if (selectedDate) {
-        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-        url += `data=${formattedDate}&`;
-      }
-      
-      if (filterStatus) {
-        url += `status=${filterStatus}&`;
-      }
-      
-      if (filterCategoryId) {
-        url += `categoria_id=${filterCategoryId}&`;
-      }
-      
-      if (filterTagId) {
-        url += `tag_id=${filterTagId}&`;
-      }
-      
-      // Remover o último '&' se existir
-      url = url.endsWith('&') ? url.slice(0, -1) : url;
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error('Falha ao buscar tarefas');
-      }
-      
-      const data = await response.json();
-      setTasks(data);
-    } catch (error) {
-      console.error('Erro ao buscar tarefas:', error);
-      setError('Não foi possível carregar as tarefas');
-      toast({
-        title: "Erro ao carregar tarefas",
-        description: "Verifique sua conexão e tente novamente",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [filterStatus, selectedDate, filterCategoryId, filterTagId, toast]);
-
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
-
-  const toggleTaskCompletion = async (taskId: string) => {
-    try {
-      // Encontrar a tarefa atual para poder fazer toggle
-      const tarefa = tasks.find(task => task.id === taskId);
-      
-      if (!tarefa) return;
-      
-      const endpoint = tarefa.concluida 
-        ? `/api/tarefas/${taskId}` 
-        : `/api/tarefas/${taskId}/concluir`;
-      
-      const method = tarefa.concluida ? 'PUT' : 'PATCH';
-      
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(tarefa.concluida 
-          ? { ...tarefa, concluida: false } 
-          : {}),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Falha ao atualizar tarefa');
-      }
-      
-      // Atualizar estado local
-      setTasks(prevTasks => prevTasks.map(task => 
-        task.id === taskId 
-          ? { ...task, concluida: !task.concluida } 
-          : task
-      ));
-      
-      toast({
-        title: tarefa.concluida ? "Tarefa desmarcada" : "Tarefa concluída!",
-        description: tarefa.concluida 
-          ? "A tarefa foi desmarcada como concluída" 
-          : `Você ganhou ${tarefa.pontos_xp} pontos de XP!`,
-      });
-      
-      // Recarregar tarefas para pegar mudanças do servidor (como tarefas recorrentes)
-      setTimeout(() => {
-        fetchTasks();
-        if (onTaskUpdate) {
-          onTaskUpdate();
-        }
-      }, 1000);
-    } catch (error) {
-      console.error('Erro ao atualizar tarefa:', error);
-      toast({
-        title: "Erro ao atualizar tarefa",
-        description: "Ocorreu um erro ao atualizar o status da tarefa",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleAdiarTarefa = async (taskId: string) => {
-    try {
-      // Abrir um prompt para o usuário informar a nova data
-      const dataStr = prompt('Informe a nova data (DD/MM/AAAA):');
-      
-      if (!dataStr) return;
-      
-      // Converter para o formato ISO
-      const partesData = dataStr.split('/');
-      if (partesData.length !== 3) {
-        toast({
-          title: "Formato de data inválido",
-          description: "Use o formato DD/MM/AAAA",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      const novaData = `${partesData[2]}-${partesData[1]}-${partesData[0]}`;
-      
-      const response = await fetch(`/api/tarefas/${taskId}/adiar`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ nova_data: novaData }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Falha ao adiar tarefa');
-      }
-      
-      toast({
-        title: "Tarefa adiada",
-        description: `A tarefa foi adiada para ${dataStr}`,
-      });
-      
-      // Recarregar a lista de tarefas
-      fetchTasks();
-      if (onTaskUpdate) {
-        onTaskUpdate();
-      }
-    } catch (error) {
-      console.error('Erro ao adiar tarefa:', error);
-      toast({
-        title: "Erro ao adiar tarefa",
-        description: "Ocorreu um erro ao adiar a tarefa",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDuplicarTarefa = async (taskId: string) => {
-    try {
-      const response = await fetch(`/api/tarefas/${taskId}/duplicar`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Falha ao duplicar tarefa');
-      }
-      
-      toast({
-        title: "Tarefa duplicada",
-        description: "Uma cópia da tarefa foi criada",
-      });
-      
-      // Recarregar a lista de tarefas
-      fetchTasks();
-      if (onTaskUpdate) {
-        onTaskUpdate();
-      }
-    } catch (error) {
-      console.error('Erro ao duplicar tarefa:', error);
-      toast({
-        title: "Erro ao duplicar tarefa",
-        description: "Ocorreu um erro ao duplicar a tarefa",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleRemoverTarefa = async (taskId: string) => {
-    try {
-      if (!confirm('Tem certeza que deseja excluir esta tarefa?')) {
-        return;
-      }
-      
-      const response = await fetch(`/api/tarefas/${taskId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Falha ao remover tarefa');
-      }
-      
-      // Atualizar estado local removendo a tarefa
-      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
-      
-      toast({
-        title: "Tarefa removida",
-        description: "A tarefa foi removida com sucesso",
-      });
-
-      if (onTaskUpdate) {
-        onTaskUpdate();
-      }
-    } catch (error) {
-      console.error('Erro ao remover tarefa:', error);
-      toast({
-        title: "Erro ao remover tarefa",
-        description: "Ocorreu um erro ao remover a tarefa",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Filtrar tarefas com base no status (se necessário)
-  let filteredTasks = tasks;
-
-  // Determinar quais tarefas exibir (todas ou limitadas)
-  const displayTasks = expanded ? filteredTasks : filteredTasks.filter((task) => !task.concluida).slice(0, 3);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-10">
-        <Loader2 className="h-10 w-10 animate-spin text-cyan-500" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="py-8 text-center">
-        <p className="text-red-500">{error}</p>
-        <Button onClick={fetchTasks} className="mt-4">
-          Tentar novamente
-        </Button>
-      </div>
-    );
-  }
-
-  if (displayTasks.length === 0) {
-    return (
-      <div className="py-8 text-center">
-        <p className="text-slate-400">Nenhuma tarefa encontrada</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {displayTasks.map((task) => (
@@ -424,16 +154,294 @@ export function TaskList({
           </DropdownMenu>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Componente principal de lista de tarefas
+export function TaskList({
+  expanded = false,
+  filterStatus,
+  selectedDate,
+  filterCategoryId,
+  filterTagId,
+  onTaskUpdate,
+}: { 
+  expanded?: boolean; 
+  filterStatus?: "pendente" | "concluida" | "recorrente";
+  selectedDate?: Date;
+  filterCategoryId?: string;
+  filterTagId?: string;
+  onTaskUpdate?: () => void;
+}) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const router = useRouter();
+
+  // Usar useCallback para evitar recriação da função a cada render
+  const fetchTasks = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Construir URL com parâmetros
+      let url = '/api/tarefas?';
+      
+      if (selectedDate) {
+        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+        url += `data=${formattedDate}&`;
+      }
+      
+      if (filterStatus) {
+        url += `status=${filterStatus}&`;
+      }
+      
+      if (filterCategoryId) {
+        url += `categoria_id=${filterCategoryId}&`;
+      }
+      
+      if (filterTagId) {
+        url += `tag_id=${filterTagId}&`;
+      }
+      
+      // Remover o último '&' se existir
+      url = url.endsWith('&') ? url.slice(0, -1) : url;
+      
+      try {
+        const data = await fetchAPI(url);
+        setTasks(data || []);
+      } catch (apiError) {
+        console.error('Erro na API:', apiError);
+        setTasks([]); // Definir como array vazio em caso de erro
+      }
+    } catch (error) {
+      console.error('Erro ao buscar tarefas:', error);
+      setError('Não foi possível carregar as tarefas');
+      toast({
+        title: "Erro ao carregar tarefas",
+        description: "Verifique sua conexão e tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [filterStatus, selectedDate, filterCategoryId, filterTagId, toast]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  const toggleTaskCompletion = async (taskId: string) => {
+    try {
+      // Encontrar a tarefa atual para poder fazer toggle
+      const tarefa = tasks.find(task => task.id === taskId);
+      
+      if (!tarefa) return;
+      
+      const endpoint = tarefa.concluida 
+        ? `/api/tarefas/${taskId}` 
+        : `/api/tarefas/${taskId}/concluir`;
+      
+      const method = tarefa.concluida ? 'PUT' : 'PATCH';
+      
+      const response = await fetchAPI(endpoint, {
+        method,
+        body: JSON.stringify(tarefa.concluida 
+          ? { ...tarefa, concluida: false } 
+          : {}),
+      });
+      
+      // Atualizar estado local
+      setTasks(prevTasks => prevTasks.map(task => 
+        task.id === taskId 
+          ? { ...task, concluida: !task.concluida } 
+          : task
+      ));
+      
+      toast({
+        title: tarefa.concluida ? "Tarefa desmarcada" : "Tarefa concluída!",
+        description: tarefa.concluida 
+          ? "A tarefa foi desmarcada como concluída" 
+          : `Você ganhou ${tarefa.pontos_xp} pontos de XP!`,
+      });
+      
+      // Recarregar tarefas para pegar mudanças do servidor (como tarefas recorrentes)
+      setTimeout(() => {
+        fetchTasks();
+        if (onTaskUpdate) {
+          onTaskUpdate();
+        }
+      }, 1000);
+    } catch (error) {
+      console.error('Erro ao atualizar tarefa:', error);
+      toast({
+        title: "Erro ao atualizar tarefa",
+        description: "Ocorreu um erro ao atualizar o status da tarefa",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAdiarTarefa = async (taskId: string) => {
+    try {
+      // Abrir um prompt para o usuário informar a nova data
+      const dataStr = prompt('Informe a nova data (DD/MM/AAAA):');
+      
+      if (!dataStr) return;
+      
+      // Converter para o formato ISO
+      const partesData = dataStr.split('/');
+      if (partesData.length !== 3) {
+        toast({
+          title: "Formato de data inválido",
+          description: "Use o formato DD/MM/AAAA",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const novaData = `${partesData[2]}-${partesData[1]}-${partesData[0]}`;
+      
+      await fetchAPI(`/api/tarefas/${taskId}/adiar`, {
+        method: 'PATCH',
+        body: JSON.stringify({ nova_data: novaData }),
+      });
+      
+      toast({
+        title: "Tarefa adiada",
+        description: `A tarefa foi adiada para ${dataStr}`,
+      });
+      
+      // Recarregar a lista de tarefas
+      fetchTasks();
+      if (onTaskUpdate) {
+        onTaskUpdate();
+      }
+    } catch (error) {
+      console.error('Erro ao adiar tarefa:', error);
+      toast({
+        title: "Erro ao adiar tarefa",
+        description: "Ocorreu um erro ao adiar a tarefa",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDuplicarTarefa = async (taskId: string) => {
+    try {
+      await fetchAPI(`/api/tarefas/${taskId}/duplicar`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      
+      toast({
+        title: "Tarefa duplicada",
+        description: "Uma cópia da tarefa foi criada",
+      });
+      
+      // Recarregar a lista de tarefas
+      fetchTasks();
+      if (onTaskUpdate) {
+        onTaskUpdate();
+      }
+    } catch (error) {
+      console.error('Erro ao duplicar tarefa:', error);
+      toast({
+        title: "Erro ao duplicar tarefa",
+        description: "Ocorreu um erro ao duplicar a tarefa",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoverTarefa = async (taskId: string) => {
+    try {
+      if (!confirm('Tem certeza que deseja excluir esta tarefa?')) {
+        return;
+      }
+      
+      await fetchAPI(`/api/tarefas/${taskId}`, {
+        method: 'DELETE',
+      });
+      
+      // Atualizar estado local removendo a tarefa
+      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+      
+      toast({
+        title: "Tarefa removida",
+        description: "A tarefa foi removida com sucesso",
+      });
+
+      if (onTaskUpdate) {
+        onTaskUpdate();
+      }
+    } catch (error) {
+      console.error('Erro ao remover tarefa:', error);
+      toast({
+        title: "Erro ao remover tarefa",
+        description: "Ocorreu um erro ao remover a tarefa",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Filtrar tarefas com base no status (se necessário)
+  let filteredTasks = tasks;
+
+  // Determinar quais tarefas exibir (todas ou limitadas)
+  const displayTasks = expanded ? filteredTasks : filteredTasks.filter((task) => !task.concluida).slice(0, 3);
+
+  // Aqui estamos seguindo um único caminho de renderização, garantindo que a ordem dos hooks é consistente
+  if (loading) {
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="h-10 w-10 animate-spin text-cyan-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="py-8 text-center">
+        <p className="text-red-500">{error}</p>
+        <Button onClick={fetchTasks} className="mt-4">
+          Tentar novamente
+        </Button>
+      </div>
+    );
+  }
+
+  if (displayTasks.length === 0) {
+    return (
+      <div className="py-8 text-center">
+        <p className="text-slate-400">Nenhuma tarefa encontrada</p>
+      </div>
+    );
+  }
+
+  // Se chegamos aqui, significa que temos tarefas para mostrar
+  return (
+    <div className="space-y-4">
+      <TaskListContent 
+        displayTasks={displayTasks}
+        toggleTaskCompletion={toggleTaskCompletion}
+        handleAdiarTarefa={handleAdiarTarefa}
+        handleDuplicarTarefa={handleDuplicarTarefa}
+        handleRemoverTarefa={handleRemoverTarefa}
+      />
+      
       {!expanded && filteredTasks.filter((task) => !task.concluida).length > 3 && (
         <Button 
           variant="ghost" 
           className="w-full justify-start text-slate-400"
-          onClick={() => window.location.href = '/tarefas'}
+          onClick={() => router.push('/tarefas')}
         >
           <Plus className="mr-2 h-4 w-4" />
           Ver mais {filteredTasks.filter((task) => !task.concluida).length - 3} tarefas
         </Button>
       )}
     </div>
-  )
+  );
 }

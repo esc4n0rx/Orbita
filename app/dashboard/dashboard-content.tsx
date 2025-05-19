@@ -13,6 +13,7 @@ import { AppLayout } from "@/components/app-layout"
 import { NewTaskDialog } from "@/components/new-task-dialog"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { fetchAPI } from "@/lib/api";
 import { Era, format, LocaleDayPeriod, LocalizeFnOptions, Quarter } from "date-fns"
 import {
   ChevronDown,
@@ -56,16 +57,26 @@ export default function DashboardPage() {
   const fetchStatistics = async () => {
     try {
       setStatLoading(true);
-      const response = await fetch('/api/estatisticas');
-      
-      if (!response.ok) {
-        throw new Error('Falha ao buscar estatísticas');
-      }
-      
-      const data = await response.json();
+      const data = await fetchAPI('/api/estatisticas');
       setStatData(data);
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
+      // Configurar dados padrão em caso de erro
+      setStatData({
+        stats: {
+          tarefas_concluidas: 0,
+          tarefas_pendentes: 0,
+          total_pontos_xp: 0
+        },
+        usuario: {
+          nome: user?.email || "Usuário",
+          nivel: 1,
+          pontos_xp: 0,
+          proximo_nivel_xp: 100,
+          sequencia_dias: 0
+        },
+        grafico: []
+      });
     } finally {
       setStatLoading(false);
     }
