@@ -1,4 +1,4 @@
-// components/register-form.tsx (atualizado)
+// components/register-form.tsx
 "use client"
 
 import type React from "react"
@@ -11,11 +11,10 @@ import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context";
-import { FcGoogle } from "react-icons/fc";
 
 export function RegisterForm() {
   const router = useRouter();
-  const { signInWithGoogle, signUpWithEmail, activeProvider } = useAuth();
+  const { signUpWithEmail } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -38,24 +37,6 @@ export function RegisterForm() {
       })
     }
   }
-
-  const handleGoogleRegister = async () => {
-    setLoading(true);
-    try {
-      const { error } = await signInWithGoogle();
-      if (error) throw error;
-
-      router.push('/dashboard');
-    } catch (error) {
-      console.error("Erro ao registrar com Google:", error);
-      toast({
-        title: "Erro ao registrar com Google",
-        description: error instanceof Error ? error.message : "Ocorreu um erro durante a autenticação.",
-        variant: "destructive",
-      });
-      setLoading(false);
-    }
-  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -85,42 +66,48 @@ export function RegisterForm() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!validateForm()) {
-    return;
-  }
-
-  setLoading(true);
-  
-  try {
-    const { data, error } = await signUpWithEmail(
-      formData.email, 
-      formData.password, 
-      formData.name
-    );
-    
-    if (error) {
-      throw error;
+    if (!validateForm()) {
+      return;
     }
+
+    setLoading(true);
     
-    toast({
-      title: "Conta criada com sucesso!",
-      description: "Redirecionando para o dashboard...",
-    });
-    
-    router.push('/dashboard');
-  } catch (error) {
-    console.error("Erro ao criar conta:", error);
-    toast({
-      title: "Erro ao criar conta",
-      description: error instanceof Error ? error.message : "Ocorreu um erro ao criar sua conta. Tente novamente.",
-      variant: "destructive",
-    });
-  } finally {
-    setLoading(false);
+    try {
+      const result = await signUpWithEmail(
+        formData.email, 
+        formData.password, 
+        formData.name
+      );
+      
+      if (!result.success) {
+        toast({
+          title: "Erro ao criar conta",
+          description: result.error || "Ocorreu um erro ao criar sua conta. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      toast({
+        title: "Conta criada com sucesso!",
+        description: "Redirecionando para o dashboard...",
+      });
+      
+      router.push('/dashboard');
+    } catch (error) {
+      console.error("Erro ao criar conta:", error);
+      toast({
+        title: "Erro ao criar conta",
+        description: error instanceof Error ? error.message : "Ocorreu um erro ao criar sua conta. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   }
-} 
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
@@ -192,16 +179,6 @@ export function RegisterForm() {
         ) : (
           "Criar conta"
         )}
-      </Button>
-
-      <Button 
-        variant="outline" 
-        className="border-slate-800 bg-slate-950/50 hover:bg-slate-900"
-        onClick={handleGoogleRegister}
-        disabled={loading}
-      >
-        <FcGoogle className="mr-2 h-4 w-4" />
-        Google
       </Button>
     </form>
   )

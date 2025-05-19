@@ -1,17 +1,16 @@
 // app/api/tarefas/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getUserId } from '@/lib/auth-helpers'
+import { getUserId } from '@/lib/auth-helpers';
 
 // GET /api/tarefas - Listar tarefas com filtros por data, status, etc.
 export async function GET(request: NextRequest) {
   try {
     const userId = await getUserId(request);
-    console.log('userId', userId);
     
-    // if (!userId) {
-    //   return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    // }
+    if (!userId) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
     
     const searchParams = request.nextUrl.searchParams;
     const data = searchParams.get('data');
@@ -19,45 +18,19 @@ export async function GET(request: NextRequest) {
     const categoriaId = searchParams.get('categoria_id');
     const tagId = searchParams.get('tag_id');
     
-    let query = supabase
-      .from('orbita_tarefas')
-      .select(`
-        *,
-        categoria:categoria_id(id, nome, cor),
-        tags:orbita_tarefa_tags(tag_id(id, nome))
-      `)
-      .eq('usuario_id', userId)
-      .order('hora_vencimento', { nullsFirst: false })
-      .order('created_at');
-    
-    // Aplicar filtros
-    if (data) {
-      query = query.eq('data_vencimento', data);
-    }
-    
-    if (status === 'pendente') {
-      query = query.eq('concluida', false);
-    } else if (status === 'concluida') {
-      query = query.eq('concluida', true);
-    } else if (status === 'recorrente') {
-      query = query.eq('recorrente', true);
-    }
-    
-    if (categoriaId) {
-      query = query.eq('categoria_id', categoriaId);
-    }
-    
-    // Aplicar filtro por tag (usando um JOIN implícito)
-    if (tagId) {
-      // Esta é uma abordagem especial para filtrar por tags
-      query = query.filter('tags.tag_id.id', 'eq', tagId);
-    }
-    
-    const { data: tarefas, error } = await query;
+    // Chamar a função que retorna tarefas
+    const { data: tarefas, error } = await supabase
+      .rpc('orbita_obter_tarefas', {
+        usuario_uuid: userId,
+        data_filtro: data || null,
+        status_filtro: status || null,
+        categoria_id_filtro: categoriaId || null,
+        tag_id_filtro: tagId || null
+      });
     
     if (error) throw error;
     
-    return NextResponse.json(tarefas);
+    return NextResponse.json(tarefas || []);
   } catch (error) {
     console.error('Erro ao buscar tarefas:', error);
     return NextResponse.json(
@@ -96,43 +69,89 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Inserir tarefa
-    const { data: tarefa, error } = await supabase
-      .from('orbita_tarefas')
-      .insert([
-        { 
-          usuario_id: userId,
+    // Iniciar uma transação
+    const { data: client } = await supabase.rpc('begin_transaction');
+    
+    try {
+      // Inserir tarefa
+      const insertQuery = `
+        INSERT INTO orbita_tarefas (
+          usuario_id, 
+          titulo, 
+          descricao, 
+          categoria_id, 
+          data_vencimento, 
+          hora_vencimento, 
+          pontos_xp, 
+          recorrente, 
+          padrao_recorrencia, 
+          prioridade,
+          created_at,
+          updated_at
+        ) 
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+        )
+        RETURNING *
+      `;
+      
+      const now = new Date().toISOString();
+      
+      const { data: tarefa, error } = await supabase.rpc('execute_sql_query', {
+        sql_query: insertQuery,
+        params: [
+          userId,
           titulo,
-          descricao,
-          categoria_id,
+          descricao || null,
+          categoria_id || null,
           data_vencimento,
-          hora_vencimento,
-          pontos_xp: pontos_xp || 20,
-          recorrente: recorrente || false,
-          padrao_recorrencia,
-          prioridade: prioridade || 'media'
+          hora_vencimento || null,
+          pontos_xp || 20,
+          recorrente || false,
+          padrao_recorrencia || null,
+          prioridade || 'media',
+          now,
+          now
+        ]
+      });
+      
+      if (error) throw error;
+      
+      const tarefaId = tarefa[0].id;
+      
+      // Se houver tags, associar à tarefa
+      if (tags && tags.length > 0) {
+        for (const tagId of tags) {
+          const insertTagQuery = `
+            INSERT INTO orbita_tarefa_tags (tarefa_id, tag_id)
+            VALUES ($1, $2)
+          `;
+          
+          const { error: tagError } = await supabase.rpc('execute_sql_query', {
+            sql_query: insertTagQuery,
+            params: [tarefaId, tagId]
+          });
+          
+          if (tagError) throw tagError;
         }
-      ])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    // Se houver tags, associar à tarefa
-    if (tags && tags.length > 0) {
-      const tarefaTags = tags.map((tagId: string) => ({
-        tarefa_id: tarefa.id,
-        tag_id: tagId
-      }));
+      }
       
-      const { error: tagError } = await supabase
-        .from('orbita_tarefa_tags')
-        .insert(tarefaTags);
+      // Buscar a tarefa completa com suas relações
+      const { data: tarefaCompleta } = await supabase
+        .rpc('orbita_obter_tarefas', {
+          usuario_uuid: userId,
+          tarefa_id_filtro: tarefaId
+        });
       
-      if (tagError) throw tagError;
+      // Commit da transação
+      await supabase.rpc('commit_transaction', { client_id: client });
+      
+      return NextResponse.json(tarefaCompleta[0] || tarefa[0]);
+    } catch (error) {
+      // Rollback em caso de erro
+      await supabase.rpc('rollback_transaction', { client_id: client });
+      throw error;
     }
-    
-    return NextResponse.json(tarefa);
   } catch (error) {
     console.error('Erro ao criar tarefa:', error);
     return NextResponse.json(

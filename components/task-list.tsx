@@ -1,4 +1,4 @@
-// components/task-list.tsx (versão completa com ajustes)
+// components/task-list.tsx
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -17,9 +17,8 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { fetchAPI } from "@/lib/api"
 import { useRouter } from "next/navigation"
-import { TokenService } from "@/lib/token-service"
+import { UserStorage } from "@/lib/token-service"
 
 type Task = {
   id: string
@@ -29,23 +28,13 @@ type Task = {
     id: string
     nome: string
     cor: string
-  }
+  } | null
   hora_vencimento?: string
   pontos_xp: number
   data_vencimento: string
   prioridade: string
   descricao?: string
-  tags?: { tag_id: { id: string, nome: string } }[]
-}
-
-// Função para formatar a data
-function formatarData(dataStr: string): string {
-  try {
-    const data = new Date(dataStr);
-    return format(data, 'dd/MM/yyyy', { locale: ptBR });
-  } catch (error) {
-    return dataStr;
-  }
+  tags?: Array<{ id: string, nome: string }>
 }
 
 // Componente separado para a lista de tarefas
@@ -62,6 +51,8 @@ function TaskListContent({
   handleDuplicarTarefa: (id: string) => Promise<void>;
   handleRemoverTarefa: (id: string) => Promise<void>;
 }) {
+  const router = useRouter();
+  
   return (
     <div className="space-y-4">
       {displayTasks.map((task) => (
@@ -101,12 +92,14 @@ function TaskListContent({
                     {task.hora_vencimento}
                   </span>
                 )}
-                <Badge 
-                  variant="secondary" 
-                  className={`${task.categoria?.cor || "bg-slate-500"} text-white`}
-                >
-                  {task.categoria?.nome || "sem categoria"}
-                </Badge>
+                {task.categoria && (
+                  <Badge 
+                    variant="secondary" 
+                    className={`${task.categoria.cor || "bg-slate-500"} text-white`}
+                  >
+                    {task.categoria.nome || "sem categoria"}
+                  </Badge>
+                )}
                 <span className="flex items-center gap-1">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -135,7 +128,7 @@ function TaskListContent({
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => window.location.href = `/tarefas/editar/${task.id}`}>
+              <DropdownMenuItem onClick={() => router.push(`/tasks/editar/${task.id}`)}>
                 Editar
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleAdiarTarefa(task.id)}>
@@ -182,71 +175,79 @@ export function TaskList({
   const router = useRouter();
 
   const fetchTasks = useCallback(async () => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    // Verificar se o token existe
-    const token = TokenService.getToken();
-    if (!token) {
-      console.warn('Tentando buscar tarefas sem token de autenticação');
-      setError('Sessão expirada. Por favor, faça login novamente.');
-      setLoading(false);
-      return;
-    }
-    
-    // Construir URL com parâmetros
-    let url = '/api/tarefas?';
-    
-    if (selectedDate) {
-      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-      url += `data=${formattedDate}&`;
-    }
-    
-    if (filterStatus) {
-      url += `status=${filterStatus}&`;
-    }
-    
-    if (filterCategoryId) {
-      url += `categoria_id=${filterCategoryId}&`;
-    }
-    
-    if (filterTagId) {
-      url += `tag_id=${filterTagId}&`;
-    }
-    
-    // Remover o último '&' se existir
-    url = url.endsWith('&') ? url.slice(0, -1) : url;
-    
     try {
-      const data = await fetchAPI(url);
-      setTasks(data || []);
-    } catch (apiError) {
-      console.error('Erro na API:', apiError);
+      setLoading(true);
+      setError(null);
       
-      // Verificar se é um erro de autenticação
-      if (apiError && typeof apiError === 'object' && 'message' in apiError && typeof (apiError as { message: string }).message === 'string' && (apiError as { message: string }).message.includes('401')) {
+      // Verificar se o ID do usuário existe
+      const userId = UserStorage.getUserId();
+      if (!userId) {
+        console.warn('Tentando buscar tarefas sem ID de usuário');
         setError('Sessão expirada. Por favor, faça login novamente.');
-        // Opcional: redirecionar para a página de login
-        // router.push('/');
-      } else {
-        setError('Erro ao carregar tarefas. Tente novamente.');
+        setLoading(false);
+        return;
       }
       
-      setTasks([]);
+      // Construir URL com parâmetros
+      let url = '/api/tarefas?';
+      
+      if (selectedDate) {
+        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+        url += `data=${formattedDate}&`;
+      }
+      
+      if (filterStatus) {
+        url += `status=${filterStatus}&`;
+      }
+      
+      if (filterCategoryId) {
+        url += `categoria_id=${filterCategoryId}&`;
+      }
+      
+      if (filterTagId) {
+        url += `tag_id=${filterTagId}&`;
+      }
+      
+      // Remover o último '&' se existir
+      url = url.endsWith('&') ? url.slice(0, -1) : url;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-user-id': userId
+      };
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        // Verificar se é erro de autenticação
+        if (response.status === 401 || response.status === 403) {
+          setError('Sessão expirada. Por favor, faça login novamente.');
+          UserStorage.clearUser();
+        } else {
+          setError(`Erro ao carregar tarefas (${response.status})`);
+        }
+        setTasks([]);
+        return;
+      }
+      
+      const data = await response.json();
+      setTasks(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar tarefas:', error);
+      setError('Não foi possível carregar as tarefas');
+      toast({
+        title: "Erro ao carregar tarefas",
+        description: "Verifique sua conexão e tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Erro ao buscar tarefas:', error);
-    setError('Não foi possível carregar as tarefas');
-    toast({
-      title: "Erro ao carregar tarefas",
-      description: "Verifique sua conexão e tente novamente",
-      variant: "destructive",
-    });
-  } finally {
-    setLoading(false);
-  }
-}, [filterStatus, selectedDate, filterCategoryId, filterTagId, toast]);
+  }, [filterStatus, selectedDate, filterCategoryId, filterTagId, toast]);
 
   useEffect(() => {
     fetchTasks();
@@ -259,18 +260,37 @@ export function TaskList({
       
       if (!tarefa) return;
       
+      const userId = UserStorage.getUserId();
+      if (!userId) {
+        setError('Sessão expirada. Por favor, faça login novamente.');
+        return;
+      }
+      
       const endpoint = tarefa.concluida 
         ? `/api/tarefas/${taskId}` 
         : `/api/tarefas/${taskId}/concluir`;
       
       const method = tarefa.concluida ? 'PUT' : 'PATCH';
       
-      const response = await fetchAPI(endpoint, {
+      const response = await fetch(endpoint, {
         method,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        },
         body: JSON.stringify(tarefa.concluida 
           ? { ...tarefa, concluida: false } 
           : {}),
       });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          UserStorage.clearUser();
+          setError('Sessão expirada. Por favor, faça login novamente.');
+          return;
+        }
+        throw new Error(`Erro ao atualizar tarefa: ${response.status}`);
+      }
       
       // Atualizar estado local
       setTasks(prevTasks => prevTasks.map(task => 
@@ -323,10 +343,29 @@ export function TaskList({
       
       const novaData = `${partesData[2]}-${partesData[1]}-${partesData[0]}`;
       
-      await fetchAPI(`/api/tarefas/${taskId}/adiar`, {
+      const userId = UserStorage.getUserId();
+      if (!userId) {
+        setError('Sessão expirada. Por favor, faça login novamente.');
+        return;
+      }
+      
+      const response = await fetch(`/api/tarefas/${taskId}/adiar`, {
         method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        },
         body: JSON.stringify({ nova_data: novaData }),
       });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          UserStorage.clearUser();
+          setError('Sessão expirada. Por favor, faça login novamente.');
+          return;
+        }
+        throw new Error(`Erro ao adiar tarefa: ${response.status}`);
+      }
       
       toast({
         title: "Tarefa adiada",
@@ -350,10 +389,29 @@ export function TaskList({
 
   const handleDuplicarTarefa = async (taskId: string) => {
     try {
-      await fetchAPI(`/api/tarefas/${taskId}/duplicar`, {
+      const userId = UserStorage.getUserId();
+      if (!userId) {
+        setError('Sessão expirada. Por favor, faça login novamente.');
+        return;
+      }
+      
+      const response = await fetch(`/api/tarefas/${taskId}/duplicar`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        },
         body: JSON.stringify({}),
       });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          UserStorage.clearUser();
+          setError('Sessão expirada. Por favor, faça login novamente.');
+          return;
+        }
+        throw new Error(`Erro ao duplicar tarefa: ${response.status}`);
+      }
       
       toast({
         title: "Tarefa duplicada",
@@ -381,9 +439,28 @@ export function TaskList({
         return;
       }
       
-      await fetchAPI(`/api/tarefas/${taskId}`, {
+      const userId = UserStorage.getUserId();
+      if (!userId) {
+        setError('Sessão expirada. Por favor, faça login novamente.');
+        return;
+      }
+      
+      const response = await fetch(`/api/tarefas/${taskId}`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        },
       });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          UserStorage.clearUser();
+          setError('Sessão expirada. Por favor, faça login novamente.');
+          return;
+        }
+        throw new Error(`Erro ao remover tarefa: ${response.status}`);
+      }
       
       // Atualizar estado local removendo a tarefa
       setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
@@ -406,11 +483,8 @@ export function TaskList({
     }
   };
 
-  // Filtrar tarefas com base no status (se necessário)
-  let filteredTasks = tasks;
-
   // Determinar quais tarefas exibir (todas ou limitadas)
-  const displayTasks = expanded ? filteredTasks : filteredTasks.filter((task) => !task.concluida).slice(0, 3);
+  const displayTasks = expanded ? tasks : tasks.filter((task) => !task.concluida).slice(0, 3);
 
   // Aqui estamos seguindo um único caminho de renderização, garantindo que a ordem dos hooks é consistente
   if (loading) {
@@ -451,14 +525,14 @@ export function TaskList({
         handleRemoverTarefa={handleRemoverTarefa}
       />
       
-      {!expanded && filteredTasks.filter((task) => !task.concluida).length > 3 && (
+      {!expanded && tasks.filter((task) => !task.concluida).length > 3 && (
         <Button 
           variant="ghost" 
           className="w-full justify-start text-slate-400"
-          onClick={() => router.push('/tarefas')}
+          onClick={() => router.push('/tasks')}
         >
           <Plus className="mr-2 h-4 w-4" />
-          Ver mais {filteredTasks.filter((task) => !task.concluida).length - 3} tarefas
+          Ver mais {tasks.filter((task) => !task.concluida).length - 3} tarefas
         </Button>
       )}
     </div>

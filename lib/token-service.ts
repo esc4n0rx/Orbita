@@ -1,74 +1,48 @@
 // lib/token-service.ts
-const TOKEN_KEY = 'orbita_auth_token';
-const PROVIDER_KEY = 'orbita_auth_provider';
+const USER_ID_KEY = 'orbita_user_id';
 
-export const TokenService = {
-  // Salvar token
-  setToken: (token: string): void => {
-    if (!token) {
-      console.error('Tentativa de salvar token vazio ou nulo!');
+export const UserStorage = {
+  // Salvar ID do usuário
+  setUserId: (userId: string): void => {
+    if (!userId) {
+      console.error('Tentativa de salvar ID de usuário vazio ou nulo!');
       return;
     }
     
     try {
-      localStorage.setItem(TOKEN_KEY, token);
-      console.log('Token salvo com sucesso');
+      localStorage.setItem(USER_ID_KEY, userId);
+      console.log('ID do usuário salvo com sucesso');
     } catch (error) {
-      console.error('Erro ao salvar token:', error);
+      console.error('Erro ao salvar ID do usuário:', error);
     }
   },
 
-
-  // Obter token
-  getToken: (): string | null => {
+  // Obter ID do usuário
+  getUserId: (): string | null => {
     if (typeof window === 'undefined') {
       return null;
     }
     
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      return token;
+      return localStorage.getItem(USER_ID_KEY);
     } catch (error) {
-      console.error('Erro ao obter token:', error);
+      console.error('Erro ao obter ID do usuário:', error);
       return null;
     }
   },
 
-  // Remover token
-  removeToken: (): void => {
-    localStorage.removeItem(TOKEN_KEY);
-  },
-
-  // Salvar provedor (supabase/firebase)
-  setProvider: (provider: string): void => {
-    localStorage.setItem(PROVIDER_KEY, provider);
-  },
-
-  // Obter provedor
-  getProvider: (): string | null => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(PROVIDER_KEY) || 'supabase';
-  },
-
-  // Remover provedor
-  removeProvider: (): void => {
-    localStorage.removeItem(PROVIDER_KEY);
-  },
-
-  // Limpar tudo
- clearAuth: (): void => {
+  // Limpar dados do usuário (logout)
+  clearUser: (): void => {
     try {
-      TokenService.removeToken();
-      TokenService.removeProvider();
-      console.log('Autenticação limpa com sucesso');
-      
-      // Verificação
-      const tokenRestante = localStorage.getItem(TOKEN_KEY);
-      if (tokenRestante) {
-        console.warn('ATENÇÃO: Token não foi removido corretamente!');
-      }
+      localStorage.removeItem(USER_ID_KEY);
+      console.log('Dados do usuário limpos com sucesso');
     } catch (error) {
-      console.error('Erro ao limpar autenticação:', error);
+      console.error('Erro ao limpar dados do usuário:', error);
     }
+  },
+  
+  // Verificar se o usuário está logado
+  isLoggedIn: (): boolean => {
+    return !!UserStorage.getUserId();
   }
 };

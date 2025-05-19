@@ -12,6 +12,7 @@ import { TagDialog } from "@/components/tag-dialog"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { useCheckAuth } from "@/hooks/use-check-auth"
 import {
   Select,
   SelectContent,
@@ -22,6 +23,7 @@ import {
 import { X } from "lucide-react"
 
 export default function TasksPageContent() {
+  const { isAuthenticated} = useCheckAuth()
   const router = useRouter();
   const { user, loading } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());

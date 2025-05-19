@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { UserStorage } from "@/lib/token-service"
 
 type ChartData = {
   name: string;
@@ -28,10 +29,26 @@ export function Overview() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/estatisticas');
+      const userId = UserStorage.getUserId();
+      if (!userId) {
+        setError('Sessão expirada. Por favor, faça login novamente.');
+        return;
+      }
+      
+      const response = await fetch('/api/estatisticas', {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        }
+      });
       
       if (!response.ok) {
-        throw new Error('Falha ao buscar dados de estatísticas');
+        if (response.status === 401) {
+          UserStorage.clearUser();
+          setError('Sessão expirada. Por favor, faça login novamente.');
+          return;
+        }
+        throw new Error(`Erro ao buscar estatísticas: ${response.status}`);
       }
       
       const estatisticas = await response.json();

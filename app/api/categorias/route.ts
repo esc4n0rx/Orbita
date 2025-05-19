@@ -1,27 +1,29 @@
 // app/api/categorias/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getUserId } from '@/lib/auth-helpers'
+import { getUserId } from '@/lib/auth-helpers';
 
 export async function GET(request: NextRequest) {
   try {
     const userId = await getUserId(request);
     
     if (!userId) {
-      console.log('Usuário não autenticado na rota /api/categorias');
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
     
-    console.log('Buscando categorias para o usuário:', userId);
+    const query = `
+      SELECT id, nome, cor
+      FROM orbita_categorias
+      WHERE usuario_id = $1
+      ORDER BY nome
+    `;
     
-    const { data, error } = await supabase
-      .from('orbita_categorias')
-      .select('*')
-      .eq('usuario_id', userId)
-      .order('nome');
+    const { data, error } = await supabase.rpc('execute_sql_query', {
+      sql_query: query,
+      params: [userId]
+    });
     
     if (error) {
-      console.error('Erro do Supabase ao buscar categorias:', error);
       throw error;
     }
     
@@ -53,21 +55,22 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const { data, error } = await supabase
-      .from('orbita_categorias')
-      .insert([
-        { 
-          usuario_id: userId,
-          nome, 
-          cor 
-        }
-      ])
-      .select()
-      .single();
+    const query = `
+      INSERT INTO orbita_categorias (usuario_id, nome, cor, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, nome, cor
+    `;
+    
+    const now = new Date().toISOString();
+    
+    const { data, error } = await supabase.rpc('execute_sql_query', {
+      sql_query: query,
+      params: [userId, nome, cor, now, now]
+    });
     
     if (error) throw error;
     
-    return NextResponse.json(data);
+    return NextResponse.json(data[0]);
   } catch (error) {
     console.error('Erro ao criar categoria:', error);
     return NextResponse.json(

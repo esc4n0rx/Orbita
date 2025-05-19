@@ -1,4 +1,3 @@
-// app/dashboard/dashboard-content.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -12,9 +11,8 @@ import { Overview } from "@/components/overview"
 import { AppLayout } from "@/components/app-layout"
 import { NewTaskDialog } from "@/components/new-task-dialog"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
-import { fetchAPI } from "@/lib/api";
-import { Era, format, LocaleDayPeriod, LocalizeFnOptions, Quarter } from "date-fns"
+import { UserStorage } from "@/lib/token-service"
+import { format } from "date-fns"
 import {
   ChevronDown,
   ChevronUp,
@@ -23,12 +21,12 @@ import {
   Star,
   Award,
   Clock,
-  Flame
+  Flame,
+  Loader2
 } from "lucide-react"
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
   const [statData, setStatData] = useState<any>(null);
   const [statLoading, setStatLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -42,22 +40,50 @@ export default function DashboardPage() {
   }, []);
   
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
+    // Verificar autenticação
+    const checkAuth = () => {
+      const isLoggedIn = UserStorage.isLoggedIn();
+      
+      if (!isLoggedIn) {
         console.log("Não autenticado, redirecionando para login");
         router.push('/');
-      } else {
-        console.log("Usuário autenticado, permanecendo no dashboard");
-        // Carregar estatísticas
-        fetchStatistics();
+        return;
       }
-    }
-  }, [user, loading, router]);
+      
+      // Carregar estatísticas
+      fetchStatistics();
+    };
+    
+    checkAuth();
+  }, [router]);
 
   const fetchStatistics = async () => {
     try {
       setStatLoading(true);
-      const data = await fetchAPI('/api/estatisticas');
+      
+      const userId = UserStorage.getUserId();
+      if (!userId) {
+        router.push('/');
+        return;
+      }
+      
+      const response = await fetch('/api/estatisticas', {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        }
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          UserStorage.clearUser();
+          router.push('/');
+          return;
+        }
+        throw new Error(`Erro ao buscar estatísticas: ${response.status}`);
+      }
+      
+      const data = await response.json();
       setStatData(data);
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
@@ -69,7 +95,7 @@ export default function DashboardPage() {
           total_pontos_xp: 0
         },
         usuario: {
-          nome: user?.email || "Usuário",
+          nome: "Usuário",
           nivel: 1,
           pontos_xp: 0,
           proximo_nivel_xp: 100,
@@ -137,22 +163,28 @@ export default function DashboardPage() {
     todayDate,
     "EEEE, dd 'de' MMMM", 
     { locale: { localize: {
-      day: n => ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'][n],
-      month: n => ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][n],
-      ordinalNumber: function (value: number, options?: LocalizeFnOptions): string {
-        throw new Error("Function not implemented.");
-      },
-      era: function (value: Era, options?: LocalizeFnOptions): string {
-        throw new Error("Function not implemented.");
-      },
-      quarter: function (value: Quarter, options?: LocalizeFnOptions): string {
-        throw new Error("Function not implemented.");
-      },
-      dayPeriod: function (value: LocaleDayPeriod, options?: LocalizeFnOptions): string {
-        throw new Error("Function not implemented.");
-      }
+      day: (n: number) => ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'][n],
+      month: (n: number) => ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][n],
+      ordinalNumber: function () { return ""; },
+      era: function () { return ""; },
+      quarter: function () { return ""; },
+      dayPeriod: function () { return ""; }
     }, formatLong: {} as any, options: {} } }
   );
+
+  // Se estiver carregando, mostrar indicador de carregamento
+  if (statLoading) {
+    return (
+      <AppLayout title="Dashboard">
+        <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 p-4">
+          <div className="flex flex-col items-center space-y-4 text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-cyan-500" />
+            <p className="text-md text-slate-400">Carregando estatísticas...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout title="Dashboard">
@@ -164,15 +196,9 @@ export default function DashboardPage() {
               <div>
                 <h2 className="text-xl font-semibold text-white capitalize">{formattedDate}</h2>
                 <p className="text-slate-300 text-sm">
-                  {statLoading ? (
-                    "Carregando..."
-                  ) : (
-                    <>
-                      <span>Olá, {statData?.usuario?.nome || "Usuário"}</span>
-                      {statData?.stats?.tarefas_pendentes > 0 && (
-                        <span> • {statData.stats.tarefas_pendentes} tarefas pendentes hoje</span>
-                      )}
-                    </>
+                  <span>Olá, {statData?.usuario?.nome || "Usuário"}</span>
+                  {statData?.stats?.tarefas_pendentes > 0 && (
+                    <span> • {statData.stats.tarefas_pendentes} tarefas pendentes hoje</span>
                   )}
                 </p>
               </div>

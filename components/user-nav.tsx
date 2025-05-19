@@ -1,4 +1,4 @@
-// components/user-nav.tsx (atualizado)
+// components/user-nav.tsx
 "use client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -20,7 +20,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useState } from "react"
 
 export function UserNav() {
-  const { user, userDetails, loading, signOut, activeProvider } = useAuth();
+  const { user, signOut } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -50,9 +50,9 @@ export function UserNav() {
 
   // Gerar as iniciais do nome do usuário
   const getInitials = () => {
-    if (!userDetails?.nome) return 'U';
+    if (!user?.nome) return 'U';
     
-    return userDetails.nome
+    return user.nome
       .split(' ')
       .map(n => n[0])
       .join('')
@@ -70,8 +70,8 @@ export function UserNav() {
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
               <AvatarImage 
-                src={userDetails?.avatar_url || "/placeholder.svg?height=32&width=32"} 
-                alt={userDetails?.nome || "Usuário"} 
+                src={user?.avatar_url || "/placeholder.svg?height=32&width=32"} 
+                alt={user?.nome || "Usuário"} 
               />
               <AvatarFallback className="bg-cyan-700">{getInitials()}</AvatarFallback>
             </Avatar>
@@ -80,11 +80,8 @@ export function UserNav() {
         <DropdownMenuContent className="w-56" align="end" forceMount>
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">{userDetails?.nome || "Usuário"}</p>
-              <p className="text-xs leading-none text-muted-foreground">{userDetails?.email || "usuário@exemplo.com"}</p>
-              <p className="text-xs text-muted-foreground">
-                Usando: {activeProvider === 'firebase' ? 'Firebase' : 'Supabase'}
-              </p>
+              <p className="text-sm font-medium leading-none">{user?.nome || "Usuário"}</p>
+              <p className="text-xs leading-none text-muted-foreground">{user?.email || "usuário@exemplo.com"}</p>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -105,7 +102,7 @@ export function UserNav() {
           <DropdownMenuSeparator />
           <DropdownMenuItem 
             onClick={handleLogout}
-            disabled={isLoggingOut || loading}
+            disabled={isLoggingOut}
           >
             <LogOut className="mr-2 h-4 w-4" />
             <span>{isLoggingOut ? "Saindo..." : "Sair"}</span>
