@@ -1,6 +1,7 @@
+// components/category-dialog.tsx
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,22 +16,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Plus, Trash2 } from "lucide-react"
+import { Edit, Plus, Trash2, Loader2 } from "lucide-react"
 
 type Category = {
   id: string
-  name: string
-  color: string
-  count: number
+  nome: string
+  cor: string
 }
-
-const initialCategories: Category[] = [
-  { id: "1", name: "trabalho", color: "bg-cyan-500", count: 5 },
-  { id: "2", name: "estudo", color: "bg-purple-500", count: 3 },
-  { id: "3", name: "saúde", color: "bg-green-500", count: 2 },
-  { id: "4", name: "lazer", color: "bg-yellow-500", count: 1 },
-  { id: "5", name: "rotina", color: "bg-slate-500", count: 4 },
-]
 
 const colorOptions = [
   { name: "Azul", value: "bg-cyan-500" },
@@ -46,95 +38,185 @@ const colorOptions = [
 export function CategoryDialog() {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
-  const [categories, setCategories] = useState<Category[]>(initialCategories)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(false)
   const [newCategory, setNewCategory] = useState({
-    name: "",
-    color: "bg-cyan-500",
+    nome: "",
+    cor: "bg-cyan-500",
   })
   const [editMode, setEditMode] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
 
-  const handleAddCategory = () => {
-    if (!newCategory.name.trim()) {
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/categorias');
+      
+      if (!response.ok) {
+        throw new Error('Falha ao buscar categorias');
+      }
+      
+      const data = await response.json();
+      setCategories(data);
+    } catch (error) {
+      console.error('Erro ao buscar categorias:', error);
+      toast({
+        title: "Erro ao carregar categorias",
+        description: "Verifique sua conexão e tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategory.nome.trim()) {
       toast({
         title: "Erro",
         description: "O nome da categoria não pode estar vazio.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    if (editMode && editId) {
-      // Atualizar categoria existente
-      setCategories(
-        categories.map((cat) =>
-          cat.id === editId
-            ? {
-                ...cat,
-                name: newCategory.name,
-                color: newCategory.color,
-              }
-            : cat,
-        ),
-      )
+    try {
+      setLoading(true);
+      
+      if (editMode && editId) {
+        // Atualizar categoria existente
+        const response = await fetch(`/api/categorias/${editId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newCategory),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Falha ao atualizar categoria');
+        }
+        
+        const updatedCategory = await response.json();
+        
+        setCategories(prevCategories => 
+          prevCategories.map(cat => 
+            cat.id === editId ? updatedCategory : cat
+          )
+        );
 
-      toast({
-        title: "Categoria atualizada!",
-        description: `A categoria "${newCategory.name}" foi atualizada com sucesso.`,
-      })
-    } else {
-      // Adicionar nova categoria
-      const newCat: Category = {
-        id: Date.now().toString(),
-        name: newCategory.name,
-        color: newCategory.color,
-        count: 0,
+        toast({
+          title: "Categoria atualizada!",
+          description: `A categoria "${newCategory.nome}" foi atualizada com sucesso.`,
+        });
+      } else {
+        // Adicionar nova categoria
+        const response = await fetch('/api/categorias', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newCategory),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Falha ao criar categoria');
+        }
+        
+        const newCategoryData = await response.json();
+        
+        setCategories([...categories, newCategoryData]);
+
+        toast({
+          title: "Categoria adicionada!",
+          description: `A categoria "${newCategory.nome}" foi adicionada com sucesso.`,
+        });
       }
 
-      setCategories([...categories, newCat])
-
+      // Resetar o formulário
+      setNewCategory({
+        nome: "",
+        cor: "bg-cyan-500",
+      });
+      setEditMode(false);
+      setEditId(null);
+      
+    } catch (error) {
+      console.error('Erro ao salvar categoria:', error);
       toast({
-        title: "Categoria adicionada!",
-        description: `A categoria "${newCategory.name}" foi adicionada com sucesso.`,
-      })
+        title: "Erro",
+        description: "Ocorreu um erro ao salvar a categoria.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-
-    // Resetar o formulário
-    setNewCategory({
-      name: "",
-      color: "bg-cyan-500",
-    })
-    setEditMode(false)
-    setEditId(null)
-  }
+  };
 
   const handleEditCategory = (category: Category) => {
     setNewCategory({
-      name: category.name,
-      color: category.color,
-    })
-    setEditMode(true)
-    setEditId(category.id)
-  }
+      nome: category.nome,
+      cor: category.cor,
+    });
+    setEditMode(true);
+    setEditId(category.id);
+  };
 
-  const handleDeleteCategory = (id: string) => {
-    setCategories(categories.filter((cat) => cat.id !== id))
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      if (!confirm('Tem certeza que deseja excluir esta categoria?')) {
+        return;
+      }
+      
+      setLoading(true);
+      
+      const response = await fetch(`/api/categorias/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Falha ao remover categoria');
+      }
+      
+      setCategories(categories.filter((cat) => cat.id !== id));
 
-    toast({
-      title: "Categoria removida",
-      description: "A categoria foi removida com sucesso.",
-    })
-  }
+      toast({
+        title: "Categoria removida",
+        description: "A categoria foi removida com sucesso.",
+      });
+    } catch (error) {
+      console.error('Erro ao remover categoria:', error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao remover a categoria.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <div className="flex flex-wrap gap-2 mb-4">
-        {categories.map((category) => (
-          <Badge key={category.id} className={`${category.color} text-white flex items-center gap-1 px-3 py-1`}>
-            {category.name}
-            <span className="ml-1 bg-black/20 rounded-full px-1.5 text-xs">{category.count}</span>
-          </Badge>
-        ))}
+        {loading ? (
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm text-slate-400">Carregando categorias...</span>
+          </div>
+        ) : categories.length > 0 ? (
+          categories.map((category) => (
+            <Badge key={category.id} className={`${category.cor} text-white flex items-center gap-1 px-3 py-1`}>
+              {category.nome}
+            </Badge>
+          ))
+        ) : (
+          <span className="text-sm text-slate-400">Nenhuma categoria definida</span>
+        )}
         <DialogTrigger asChild>
           <Badge variant="outline" className="cursor-pointer hover:bg-slate-800">
             <Plus className="h-3 w-3 mr-1" />
@@ -155,10 +237,11 @@ export function CategoryDialog() {
             <Label htmlFor="category-name">Nome da Categoria</Label>
             <Input
               id="category-name"
-              value={newCategory.name}
-              onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+              value={newCategory.nome}
+              onChange={(e) => setNewCategory({ ...newCategory, nome: e.target.value })}
               placeholder="Ex: Trabalho, Estudo, Lazer..."
               className="border-slate-800 bg-slate-950/50"
+              disabled={loading}
             />
           </div>
 
@@ -169,47 +252,58 @@ export function CategoryDialog() {
                 <div
                   key={color.value}
                   className={`h-8 rounded-md cursor-pointer ${color.value} ${
-                    newCategory.color === color.value ? "ring-2 ring-white ring-offset-2 ring-offset-slate-950" : ""
+                    newCategory.cor === color.value ? "ring-2 ring-white ring-offset-2 ring-offset-slate-950" : ""
                   }`}
-                  onClick={() => setNewCategory({ ...newCategory, color: color.value })}
+                  onClick={() => setNewCategory({ ...newCategory, cor: color.value })}
                   title={color.name}
                 />
               ))}
             </div>
           </div>
 
+          // components/category-dialog.tsx (continuação)
           {!editMode && (
             <div className="space-y-2">
               <Label>Categorias Existentes</Label>
               <div className="max-h-40 overflow-y-auto space-y-2 rounded-md border border-slate-800 p-2">
-                {categories.map((category) => (
-                  <div key={category.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`h-3 w-3 rounded-full ${category.color}`} />
-                      <span className="text-sm">{category.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleEditCategory(category)}
-                      >
-                        <Edit className="h-3 w-3" />
-                        <span className="sr-only">Editar</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-red-500 hover:text-red-600"
-                        onClick={() => handleDeleteCategory(category.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        <span className="sr-only">Excluir</span>
-                      </Button>
-                    </div>
+                {loading ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-cyan-500" />
                   </div>
-                ))}
+                ) : categories.length > 0 ? (
+                  categories.map((category) => (
+                    <div key={category.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`h-3 w-3 rounded-full ${category.cor}`} />
+                        <span className="text-sm">{category.nome}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleEditCategory(category)}
+                          disabled={loading}
+                        >
+                          <Edit className="h-3 w-3" />
+                          <span className="sr-only">Editar</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-red-500 hover:text-red-600"
+                          onClick={() => handleDeleteCategory(category.id)}
+                          disabled={loading}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span className="sr-only">Excluir</span>
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400 text-center py-2">Nenhuma categoria cadastrada</p>
+                )}
               </div>
             </div>
           )}
@@ -219,16 +313,29 @@ export function CategoryDialog() {
             <Button
               variant="outline"
               onClick={() => {
-                setNewCategory({ name: "", color: "bg-cyan-500" })
+                setNewCategory({ nome: "", cor: "bg-cyan-500" })
                 setEditMode(false)
                 setEditId(null)
               }}
               className="mr-2"
+              disabled={loading}
             >
               Cancelar
             </Button>
           )}
-          <Button onClick={handleAddCategory}>{editMode ? "Atualizar" : "Adicionar"}</Button>
+          <Button 
+            onClick={handleAddCategory}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {editMode ? "Atualizando..." : "Adicionando..."}
+              </>
+            ) : (
+              editMode ? "Atualizar" : "Adicionar"
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
