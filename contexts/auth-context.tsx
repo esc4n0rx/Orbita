@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | FirebaseUser | null>(null);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [activeProvider, setActiveProvider] = useState<AuthProvider>('firebase');
+  const [activeProvider, setActiveProvider] = useState<AuthProvider>('supabase');
 
   // Inicializar o estado de autenticação e escutar mudanças
   useEffect(() => {

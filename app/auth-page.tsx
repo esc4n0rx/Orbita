@@ -73,7 +73,7 @@ export default function AuthPage() {
                   <CardDescription>Entre com sua conta para acessar o sistema</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2 mb-4">
+                  {/* <div className="flex items-center space-x-2 mb-4">
                     <Label htmlFor="auth-provider">Usar Firebase</Label>
                     <Switch 
                       id="auth-provider" 
@@ -83,7 +83,7 @@ export default function AuthPage() {
                     <span className="text-xs text-slate-400">
                       {activeProvider === 'firebase' ? 'Firebase' : 'Supabase'}
                     </span>
-                  </div>
+                  </div> */}
                   <LoginForm />
                 </CardContent>
               </TabsContent>
@@ -93,7 +93,7 @@ export default function AuthPage() {
                   <CardDescription>Preencha os dados abaixo para se cadastrar</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2 mb-4">
+                  {/* <div className="flex items-center space-x-2 mb-4">
                     <Label htmlFor="auth-provider-register">Usar Firebase</Label>
                     <Switch 
                       id="auth-provider-register" 
@@ -103,7 +103,7 @@ export default function AuthPage() {
                     <span className="text-xs text-slate-400">
                       {activeProvider === 'firebase' ? 'Firebase' : 'Supabase'}
                     </span>
-                  </div>
+                  </div> */}
                   <RegisterForm />
                 </CardContent>
               </TabsContent>

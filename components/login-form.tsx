@@ -37,14 +37,10 @@ export function LoginForm() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const { error } = await signInWithGoogle();
+      const { error } = await signInWithGoogle('firebase');
       if (error) throw error;
       
-      // No caso do Firebase, redirecionamos manualmente pois a resposta é síncrona
-      if (activeProvider === 'firebase') {
-        router.push('/dashboard');
-      }
-      // No caso do Supabase, o redirecionamento é feito pelo callback
+      router.push('/dashboard');
     } catch (error) {
       console.error("Erro ao fazer login com Google:", error);
       toast({
