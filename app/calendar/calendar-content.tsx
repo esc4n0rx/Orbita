@@ -14,13 +14,11 @@ export default function CalendarPageContent() {
   const { user, loading } = useAuth();
   
   useEffect(() => {
-    // Verificar autenticação
     if (!loading && !user) {
       router.push('/');
     }
   }, [user, loading, router]);
   
-  // Mostrar indicador de carregamento enquanto verifica autenticação
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 p-4">

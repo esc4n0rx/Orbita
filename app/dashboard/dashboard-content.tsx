@@ -21,7 +21,6 @@ export default function DashboardPage() {
   const { user, loading } = useAuth();
   
   useEffect(() => {
-  // Verificar autenticação apenas quando o estado de loading for false
   if (!loading) {
     if (!user) {
       console.log("Não autenticado, redirecionando para login");
@@ -32,7 +31,7 @@ export default function DashboardPage() {
   }
 }, [user, loading, router]);
   
-  // Mostrar indicador de carregamento enquanto verifica autenticação
+
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 p-4">

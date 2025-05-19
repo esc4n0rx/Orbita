@@ -21,7 +21,6 @@ export default function AuthPage() {
   const [isPWAInstalled, setIsPWAInstalled] = useState(false);
 
   useEffect(() => {
-    // Verificar se o PWA está instalado
     const checkIfPWAInstalled = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
                           (window.navigator as any).standalone === true;
@@ -30,15 +29,12 @@ export default function AuthPage() {
     
     checkIfPWAInstalled();
     
-    // Redirecionar para o dashboard se o usuário já estiver autenticado
-    // E se NÃO estivermos em um estado de carregamento
     if (!loading && user) {
       console.log("Usuário já autenticado, redirecionando para dashboard");
       router.push('/dashboard');
     }
   }, [user, loading, router]);
 
-  // Mostrar tela de carregamento enquanto verifica a autenticação
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 p-4">
@@ -50,7 +46,7 @@ export default function AuthPage() {
     );
   }
 
-  // Se não estiver autenticado, mostrar página de login/registro
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 p-4">
       <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
@@ -147,7 +143,6 @@ export default function AuthPage() {
         </p>
       </div>
       
-      {/* Mostrar o modal de instalação apenas se o PWA não estiver instalado */}
       {!isPWAInstalled && <InstallPWAModal />}
     </div>
   )
