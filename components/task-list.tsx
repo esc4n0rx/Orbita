@@ -19,6 +19,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { fetchAPI } from "@/lib/api"
 import { useRouter } from "next/navigation"
+import { TokenService } from "@/lib/token-service"
 
 type Task = {
   id: string
@@ -180,54 +181,72 @@ export function TaskList({
   const { toast } = useToast();
   const router = useRouter();
 
-  // Usar useCallback para evitar recriação da função a cada render
   const fetchTasks = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Construir URL com parâmetros
-      let url = '/api/tarefas?';
-      
-      if (selectedDate) {
-        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-        url += `data=${formattedDate}&`;
-      }
-      
-      if (filterStatus) {
-        url += `status=${filterStatus}&`;
-      }
-      
-      if (filterCategoryId) {
-        url += `categoria_id=${filterCategoryId}&`;
-      }
-      
-      if (filterTagId) {
-        url += `tag_id=${filterTagId}&`;
-      }
-      
-      // Remover o último '&' se existir
-      url = url.endsWith('&') ? url.slice(0, -1) : url;
-      
-      try {
-        const data = await fetchAPI(url);
-        setTasks(data || []);
-      } catch (apiError) {
-        console.error('Erro na API:', apiError);
-        setTasks([]); // Definir como array vazio em caso de erro
-      }
-    } catch (error) {
-      console.error('Erro ao buscar tarefas:', error);
-      setError('Não foi possível carregar as tarefas');
-      toast({
-        title: "Erro ao carregar tarefas",
-        description: "Verifique sua conexão e tente novamente",
-        variant: "destructive",
-      });
-    } finally {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    // Verificar se o token existe
+    const token = TokenService.getToken();
+    if (!token) {
+      console.warn('Tentando buscar tarefas sem token de autenticação');
+      setError('Sessão expirada. Por favor, faça login novamente.');
       setLoading(false);
+      return;
     }
-  }, [filterStatus, selectedDate, filterCategoryId, filterTagId, toast]);
+    
+    // Construir URL com parâmetros
+    let url = '/api/tarefas?';
+    
+    if (selectedDate) {
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      url += `data=${formattedDate}&`;
+    }
+    
+    if (filterStatus) {
+      url += `status=${filterStatus}&`;
+    }
+    
+    if (filterCategoryId) {
+      url += `categoria_id=${filterCategoryId}&`;
+    }
+    
+    if (filterTagId) {
+      url += `tag_id=${filterTagId}&`;
+    }
+    
+    // Remover o último '&' se existir
+    url = url.endsWith('&') ? url.slice(0, -1) : url;
+    
+    try {
+      const data = await fetchAPI(url);
+      setTasks(data || []);
+    } catch (apiError) {
+      console.error('Erro na API:', apiError);
+      
+      // Verificar se é um erro de autenticação
+      if (apiError && typeof apiError === 'object' && 'message' in apiError && typeof (apiError as { message: string }).message === 'string' && (apiError as { message: string }).message.includes('401')) {
+        setError('Sessão expirada. Por favor, faça login novamente.');
+        // Opcional: redirecionar para a página de login
+        // router.push('/');
+      } else {
+        setError('Erro ao carregar tarefas. Tente novamente.');
+      }
+      
+      setTasks([]);
+    }
+  } catch (error) {
+    console.error('Erro ao buscar tarefas:', error);
+    setError('Não foi possível carregar as tarefas');
+    toast({
+      title: "Erro ao carregar tarefas",
+      description: "Verifique sua conexão e tente novamente",
+      variant: "destructive",
+    });
+  } finally {
+    setLoading(false);
+  }
+}, [filterStatus, selectedDate, filterCategoryId, filterTagId, toast]);
 
   useEffect(() => {
     fetchTasks();

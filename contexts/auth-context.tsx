@@ -187,27 +187,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithEmail = async (email: string, password: string) => {
-    try {
-      // Sempre usar Supabase para login com email/senha
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+  try {
+    // Sempre usar Supabase para login com email/senha
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (error) throw error;
+    
+    // Garantir que o token seja salvo
+    if (data.session?.access_token) {
+      // Log para debug - remover em produção
+      console.log('Token recebido após login:', data.session.access_token.substring(0, 20) + '...');
       
-      if (error) throw error;
-      
-      // Salvar token
-      if (data.session?.access_token) {
-        TokenService.setToken(data.session.access_token);
-        TokenService.setProvider('supabase');
-        setActiveProvider('supabase');
-      }
-      
-      setUser(data.user);
-      setSession(data.session);
-      
-      // Buscar detalhes do usuário
-      if (data.user) {
+      TokenService.setToken(data.session.access_token);
+      TokenService.setProvider('supabase');
+      setActiveProvider('supabase');
+    } else {
+      console.error('Login bem-sucedido, mas sem token de acesso');
+    }
+    
+    setUser(data.user);
+    setSession(data.session);
+    
+    // Buscar detalhes do usuário
+    if (data.user) {
+      try {
         const { data: userData } = await supabase
           .from('orbita_usuarios')
           .select('*')
@@ -215,19 +221,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single();
         
         if (userData) {
+          // Log para debug - remover em produção
+          console.log('Detalhes do usuário carregados com sucesso');
+          
           setUserDetails({
             ...userData as UserDetails,
             provider: 'supabase'
           });
+        } else {
+          console.warn('Usuário autenticado, mas sem perfil no banco de dados');
         }
+      } catch (profileError) {
+        console.error('Erro ao buscar perfil após login:', profileError);
       }
-      
-      return { data, error: null };
-    } catch (error) {
-      console.error('Erro ao fazer login com email:', error);
-      return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
-  };
+    
+    return { data, error: null };
+  } catch (error) {
+    console.error('Erro ao fazer login com email:', error);
+    return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
+  }
+};
 
   const signUpWithEmail = async (email: string, password: string, name: string) => {
     try {
@@ -246,9 +260,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Salvar token
       if (data.session?.access_token) {
-        TokenService.setToken(data.session.access_token);
+        // Salvar token com prefixo para facilitar diagnóstico
+        const token = data.session.access_token;
+        console.log('Token salvo no login:', token.substring(0, 20) + '...');
+        TokenService.setToken(token);
         TokenService.setProvider('supabase');
         setActiveProvider('supabase');
+        
+        // Verificar se o token foi realmente salvo
+        const savedToken = TokenService.getToken();
+        console.log('Token verificado após salvar:', savedToken ? (savedToken.substring(0, 20) + '...') : 'AUSENTE');
       }
       
       setUser(data.user);
@@ -302,23 +323,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    try {
-      if (activeProvider === 'supabase') {
-        await supabase.auth.signOut();
-      } else {
-        await firebaseSignOut(auth);
-      }
-      
-      // Limpar dados de autenticação
-      TokenService.clearAuth();
-      setUser(null);
-      setUserDetails(null);
-      setSession(null);
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-      throw error;
+  try {
+    console.log('Iniciando logout...');
+    
+    if (activeProvider === 'supabase') {
+      await supabase.auth.signOut();
+    } else {
+      await firebaseSignOut(auth);
     }
-  };
+    
+    // Limpar dados de autenticação
+    TokenService.clearAuth();
+    console.log('Token removido no logout');
+    
+    setUser(null);
+    setUserDetails(null);
+    setSession(null);
+    
+    console.log('Logout concluído com sucesso');
+  } catch (error) {
+    console.error('Erro ao fazer logout:', error);
+    throw error;
+  }
+};
 
   const refreshUser = async () => {
     try {

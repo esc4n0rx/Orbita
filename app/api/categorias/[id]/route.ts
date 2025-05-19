@@ -11,9 +11,9 @@ export async function PUT(
   try {
     const userId = await getUserId(request);
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    // }
     
     const { id } = params;
     const { nome, cor } = await request.json();

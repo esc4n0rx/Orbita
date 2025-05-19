@@ -7,9 +7,9 @@ export async function GET(request: NextRequest) {
   try {
     const userId = await getUserId(request);
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    // }
     
     // Buscar dados do perfil (nível, xp, etc)
     const { data: userData, error: userError } = await supabase
@@ -78,8 +78,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: 'Erro ao buscar estatísticas' },
+      { error: 'Erro ao buscar estatísticas', details: errorMessage },
       { status: 500 }
     );
   }

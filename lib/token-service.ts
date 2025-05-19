@@ -5,13 +5,33 @@ const PROVIDER_KEY = 'orbita_auth_provider';
 export const TokenService = {
   // Salvar token
   setToken: (token: string): void => {
-    localStorage.setItem(TOKEN_KEY, token);
+    if (!token) {
+      console.error('Tentativa de salvar token vazio ou nulo!');
+      return;
+    }
+    
+    try {
+      localStorage.setItem(TOKEN_KEY, token);
+      console.log('Token salvo com sucesso');
+    } catch (error) {
+      console.error('Erro ao salvar token:', error);
+    }
   },
+
 
   // Obter token
   getToken: (): string | null => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(TOKEN_KEY);
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      return token;
+    } catch (error) {
+      console.error('Erro ao obter token:', error);
+      return null;
+    }
   },
 
   // Remover token
@@ -36,8 +56,19 @@ export const TokenService = {
   },
 
   // Limpar tudo
-  clearAuth: (): void => {
-    TokenService.removeToken();
-    TokenService.removeProvider();
+ clearAuth: (): void => {
+    try {
+      TokenService.removeToken();
+      TokenService.removeProvider();
+      console.log('Autenticação limpa com sucesso');
+      
+      // Verificação
+      const tokenRestante = localStorage.getItem(TOKEN_KEY);
+      if (tokenRestante) {
+        console.warn('ATENÇÃO: Token não foi removido corretamente!');
+      }
+    } catch (error) {
+      console.error('Erro ao limpar autenticação:', error);
+    }
   }
 };

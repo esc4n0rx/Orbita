@@ -3,14 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getUserId } from '@/lib/auth-helpers'
 
-// GET /api/categorias - Listar todas as categorias do usuário
 export async function GET(request: NextRequest) {
   try {
     const userId = await getUserId(request);
     
     if (!userId) {
+      console.log('Usuário não autenticado na rota /api/categorias');
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
+    
+    console.log('Buscando categorias para o usuário:', userId);
     
     const { data, error } = await supabase
       .from('orbita_categorias')
@@ -18,9 +20,12 @@ export async function GET(request: NextRequest) {
       .eq('usuario_id', userId)
       .order('nome');
     
-    if (error) throw error;
+    if (error) {
+      console.error('Erro do Supabase ao buscar categorias:', error);
+      throw error;
+    }
     
-    return NextResponse.json(data);
+    return NextResponse.json(data || []);
   } catch (error) {
     console.error('Erro ao buscar categorias:', error);
     return NextResponse.json(

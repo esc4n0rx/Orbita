@@ -3,14 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getUserId } from '@/lib/auth-helpers';
 
-// GET /api/tags - Listar todas as tags do usuário
 export async function GET(request: NextRequest) {
   try {
     const userId = await getUserId(request);
     
     if (!userId) {
+      console.log('Usuário não autenticado na rota /api/tags');
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
+    
+    console.log('Buscando tags para o usuário:', userId);
     
     const { data, error } = await supabase
       .from('orbita_tags')
@@ -18,9 +20,12 @@ export async function GET(request: NextRequest) {
       .eq('usuario_id', userId)
       .order('nome');
     
-    if (error) throw error;
+    if (error) {
+      console.error('Erro do Supabase ao buscar tags:', error);
+      throw error;
+    }
     
-    return NextResponse.json(data);
+    return NextResponse.json(data || []);
   } catch (error) {
     console.error('Erro ao buscar tags:', error);
     return NextResponse.json(
