@@ -1,3 +1,4 @@
+// app/layout.tsx (atualizado com meta tags para PWA)
 import type React from "react"
 import type { Metadata, Viewport } from "next/types"
 import { Inter } from "next/font/google"
@@ -13,9 +14,14 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: [
     { rel: "icon", url: "/favicon.ico" },
-    { rel: "apple-touch-icon", url: "/icon-192x192.png" },
+    { rel: "apple-touch-icon", url: "/apple-touch-icon.png" },
   ],
-  generator: 'v0.dev'
+  generator: 'v0.dev',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Orbita',
+  },
 }
 
 export const viewport: Viewport = {
@@ -24,6 +30,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
@@ -33,6 +40,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <meta name="application-name" content="Orbita" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Orbita" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
       <body className={`${inter.className} bg-slate-950 text-slate-50`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           {children}

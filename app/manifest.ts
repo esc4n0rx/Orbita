@@ -14,14 +14,26 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icon-192x192.png",
         sizes: "192x192",
         type: "image/png",
-        purpose: "maskable",
+        purpose: "maskable"
       },
       {
         src: "/icon-512x512.png",
         sizes: "512x512",
         type: "image/png",
-        purpose: "maskable",
+        purpose: "maskable"
       },
+      {
+        src: "/icon-384x384.png",
+        sizes: "384x384",
+        type: "image/png",
+        purpose: "maskable"
+      },
+      {
+        src: "/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+        purpose: "any"
+      }
     ],
     orientation: "portrait",
     categories: ["productivity", "lifestyle", "health"],
@@ -30,8 +42,21 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/screenshots/dashboard.png",
         sizes: "1280x720",
         type: "image/png",
-        label: "Dashboard do Orbita",
-      },
+        label: "Dashboard do Orbita"
+      }
     ],
+    prefer_related_applications: false,
+    shortcuts: [
+      {
+        name: "Dashboard",
+        url: "/dashboard",
+        description: "Acessar o dashboard principal"
+      },
+      {
+        name: "Tarefas",
+        url: "/tasks",
+        description: "Gerenciar suas tarefas"
+      }
+    ]
   }
 }

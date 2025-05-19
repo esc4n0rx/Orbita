@@ -1,4 +1,4 @@
-// app/auth-page.tsx (modificado)
+// app/auth-page.tsx (com modal de instalação)
 "use client";
 
 import Link from "next/link"
@@ -7,25 +7,36 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LoginForm } from "@/components/login-form"
 import { RegisterForm } from "@/components/register-form"
-import { Star } from "lucide-react"
+import { Smartphone, Star } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context";
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { InstallPWAModal } from "@/components/install-pwa-modal"
 
 export default function AuthPage() {
   const router = useRouter();
   const { user, loading, activeProvider, switchProvider } = useAuth();
+  const [isPWAInstalled, setIsPWAInstalled] = useState(false);
 
   useEffect(() => {
-  // Redirecionar para o dashboard se o usuário já estiver autenticado
-  // E se NÃO estivermos em um estado de carregamento
-  if (!loading && user) {
-    console.log("Usuário já autenticado, redirecionando para dashboard");
-    router.push('/dashboard');
-  }
-}, [user, loading, router]);
+    // Verificar se o PWA está instalado
+    const checkIfPWAInstalled = () => {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                          (window.navigator as any).standalone === true;
+      setIsPWAInstalled(isStandalone);
+    };
+    
+    checkIfPWAInstalled();
+    
+    // Redirecionar para o dashboard se o usuário já estiver autenticado
+    // E se NÃO estivermos em um estado de carregamento
+    if (!loading && user) {
+      console.log("Usuário já autenticado, redirecionando para dashboard");
+      router.push('/dashboard');
+    }
+  }, [user, loading, router]);
 
   // Mostrar tela de carregamento enquanto verifica a autenticação
   if (loading) {
@@ -53,54 +64,75 @@ export default function AuthPage() {
           </p>
         </div>
 
-        <Card className="border-slate-800 bg-slate-900/50">
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-slate-800/50">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Cadastro</TabsTrigger>
-            </TabsList>
-            <TabsContent value="login">
-              <CardHeader>
-                <CardTitle className="text-xl">Bem-vindo de volta</CardTitle>
-                <CardDescription>Entre com sua conta para acessar o sistema</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Label htmlFor="auth-provider">Usar Firebase</Label>
-                  <Switch 
-                    id="auth-provider" 
-                    checked={activeProvider === 'firebase'}
-                    onCheckedChange={(checked) => switchProvider(checked ? 'firebase' : 'supabase')}
-                  />
-                  <span className="text-xs text-slate-400">
-                    {activeProvider === 'firebase' ? 'Firebase' : 'Supabase'}
-                  </span>
-                </div>
-                <LoginForm />
-              </CardContent>
-            </TabsContent>
-            <TabsContent value="register">
-              <CardHeader>
-                <CardTitle className="text-xl">Crie sua conta</CardTitle>
-                <CardDescription>Preencha os dados abaixo para se cadastrar</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Label htmlFor="auth-provider-register">Usar Firebase</Label>
-                  <Switch 
-                    id="auth-provider-register" 
-                    checked={activeProvider === 'firebase'}
-                    onCheckedChange={(checked) => switchProvider(checked ? 'firebase' : 'supabase')}
-                  />
-                  <span className="text-xs text-slate-400">
-                    {activeProvider === 'firebase' ? 'Firebase' : 'Supabase'}
-                  </span>
-                </div>
-                <RegisterForm />
-              </CardContent>
-            </TabsContent>
-          </Tabs>
-        </Card>
+        {isPWAInstalled ? (
+          <Card className="border-slate-800 bg-slate-900/50">
+            <Tabs defaultValue="login" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-slate-800/50">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="register">Cadastro</TabsTrigger>
+              </TabsList>
+              <TabsContent value="login">
+                <CardHeader>
+                  <CardTitle className="text-xl">Bem-vindo de volta</CardTitle>
+                  <CardDescription>Entre com sua conta para acessar o sistema</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Label htmlFor="auth-provider">Usar Firebase</Label>
+                    <Switch 
+                      id="auth-provider" 
+                      checked={activeProvider === 'firebase'}
+                      onCheckedChange={(checked) => switchProvider(checked ? 'firebase' : 'supabase')}
+                    />
+                    <span className="text-xs text-slate-400">
+                      {activeProvider === 'firebase' ? 'Firebase' : 'Supabase'}
+                    </span>
+                  </div>
+                  <LoginForm />
+                </CardContent>
+              </TabsContent>
+              <TabsContent value="register">
+                <CardHeader>
+                  <CardTitle className="text-xl">Crie sua conta</CardTitle>
+                  <CardDescription>Preencha os dados abaixo para se cadastrar</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Label htmlFor="auth-provider-register">Usar Firebase</Label>
+                    <Switch 
+                      id="auth-provider-register" 
+                      checked={activeProvider === 'firebase'}
+                      onCheckedChange={(checked) => switchProvider(checked ? 'firebase' : 'supabase')}
+                    />
+                    <span className="text-xs text-slate-400">
+                      {activeProvider === 'firebase' ? 'Firebase' : 'Supabase'}
+                    </span>
+                  </div>
+                  <RegisterForm />
+                </CardContent>
+              </TabsContent>
+            </Tabs>
+          </Card>
+        ) : (
+          <Card className="border-slate-800 bg-slate-900/50">
+            <CardHeader>
+              <CardTitle className="text-xl text-center">Instale o Orbita</CardTitle>
+              <CardDescription className="text-center">
+                Para utilizar o Orbita, é necessário instalá-lo como um aplicativo 
+                em seu dispositivo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <Smartphone className="h-20 w-20 text-cyan-500" />
+            </CardContent>
+            <CardFooter className="flex flex-col space-y-2">
+              <p className="text-sm text-slate-400 text-center">
+                Siga as instruções na tela para instalar o Orbita e aproveitar 
+                ao máximo suas funcionalidades.
+              </p>
+            </CardFooter>
+          </Card>
+        )}
 
         <p className="px-8 text-center text-sm text-slate-400">
           Ao continuar, você concorda com nossos{" "}
@@ -114,6 +146,9 @@ export default function AuthPage() {
           .
         </p>
       </div>
+      
+      {/* Mostrar o modal de instalação apenas se o PWA não estiver instalado */}
+      {!isPWAInstalled && <InstallPWAModal />}
     </div>
   )
 }
