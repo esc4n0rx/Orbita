@@ -21,11 +21,16 @@ export default function DashboardPage() {
   const { user, loading } = useAuth();
   
   useEffect(() => {
-    // Verificar autenticação
-    if (!loading && !user) {
+  // Verificar autenticação apenas quando o estado de loading for false
+  if (!loading) {
+    if (!user) {
+      console.log("Não autenticado, redirecionando para login");
       router.push('/');
+    } else {
+      console.log("Usuário autenticado, permanecendo no dashboard");
     }
-  }, [user, loading, router]);
+  }
+}, [user, loading, router]);
   
   // Mostrar indicador de carregamento enquanto verifica autenticação
   if (loading) {

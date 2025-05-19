@@ -19,11 +19,13 @@ export default function AuthPage() {
   const { user, loading, activeProvider, switchProvider } = useAuth();
 
   useEffect(() => {
-    // Redirecionar para o dashboard se o usuário já estiver autenticado
-    if (!loading && user) {
-      router.push('/dashboard');
-    }
-  }, [user, loading, router]);
+  // Redirecionar para o dashboard se o usuário já estiver autenticado
+  // E se NÃO estivermos em um estado de carregamento
+  if (!loading && user) {
+    console.log("Usuário já autenticado, redirecionando para dashboard");
+    router.push('/dashboard');
+  }
+}, [user, loading, router]);
 
   // Mostrar tela de carregamento enquanto verifica a autenticação
   if (loading) {

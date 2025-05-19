@@ -78,11 +78,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
         } else {
-          // Verificar usuário Firebase
-          const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-            setUser(firebaseUser);
-            
-            if (firebaseUser) {
+           const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+          console.log("Firebase auth state changed:", firebaseUser ? "User logged in" : "No user");
+          
+          setUser(firebaseUser);
+          
+          if (firebaseUser) {
+            // Para evitar múltiplas consultas ao Firestore, verificamos se já temos os detalhes
+            if (!userDetails || userDetails.id !== firebaseUser.uid) {
               // Buscar detalhes do perfil no Firestore
               const userRef = doc(db, 'orbita_usuarios', firebaseUser.uid);
               const userSnap = await getDoc(userRef);
@@ -108,55 +111,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 await setDoc(userRef, newUserDetails);
                 setUserDetails(newUserDetails);
               }
-            } else {
-              setUserDetails(null);
             }
-            
-            setLoading(false);
-          });
-          
-          return () => unsubscribe();
-        }
-      } catch (error) {
-        console.error("Erro ao inicializar autenticação:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    initAuth();
-    
-    // Configurar o listener para mudanças na autenticação do Supabase
-    if (activeProvider === 'supabase') {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          setSession(session);
-          setUser(session?.user || null);
-          
-          if (session?.user) {
-            // Buscar detalhes do perfil quando houver mudança na autenticação
-            const { data } = await supabase
-              .from('orbita_usuarios')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-            
-            setUserDetails({
-              ...data as UserDetails,
-              provider: 'supabase'
-            });
           } else {
             setUserDetails(null);
           }
-        }
-      );
-      
-      // Limpar listener
-      return () => {
-        subscription.unsubscribe();
-      };
+          
+          setLoading(false);
+        });
+        
+        return () => unsubscribe();
+      }
+    } catch (error) {
+      console.error("Erro ao inicializar autenticação:", error);
+      setLoading(false);
     }
-  }, [activeProvider]);
+  };
+  
+  initAuth();
+  
+  // Configurar o listener para Supabase aqui se necessário
+}, [activeProvider]);
 
   const signInWithGoogle = async (provider: AuthProvider = activeProvider) => {
     try {
