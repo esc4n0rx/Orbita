@@ -48,69 +48,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | FirebaseUser | null>(null);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [activeProvider, setActiveProvider] = useState<AuthProvider>('supabase');
+  const [activeProvider, setActiveProvider] = useState<AuthProvider>(() => {
+    if (typeof window !== 'undefined') {
+      const savedProvider = localStorage.getItem('auth_provider');
+      return (savedProvider as AuthProvider) || 'firebase';
+    }
+    return 'supabase'; 
+  });
 
-  // Inicializar o estado de autenticação e escutar mudanças
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        setLoading(true);
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn("Timeout de segurança acionado para estado de loading");
+        setLoading(false);
+      }
+    }, 5000); 
+
+    return () => clearTimeout(safetyTimeout);
+  }, [loading]);
+
+
+  useEffect(() => {
+  const initAuth = async () => {
+    try {
+      setLoading(true);
+      
+      if (activeProvider === 'supabase') {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user || null);
         
-        if (activeProvider === 'supabase') {
-          // Verificar a sessão atual no Supabase
-          const { data: { session } } = await supabase.auth.getSession();
-          setSession(session);
-          setUser(session?.user || null);
+        if (session?.user) {
+          const { data, error } = await supabase
+            .from('orbita_usuarios')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
           
-          if (session?.user) {
-            // Buscar detalhes do perfil
-            const { data, error } = await supabase
-              .from('orbita_usuarios')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-            
-            if (data && !error) {
-              setUserDetails({
-                ...data as UserDetails,
-                provider: 'supabase'
-              });
-            }
+          if (data && !error) {
+            setUserDetails({
+              ...data as UserDetails,
+              provider: 'supabase'
+            });
           }
-        } else {
-           const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-          console.log("Firebase auth state changed:", firebaseUser ? "User logged in" : "No user");
-          
+        }
+        
+        setLoading(false);
+      } else {
+        const unsubFirebase = auth.onAuthStateChanged(async (firebaseUser) => {
           setUser(firebaseUser);
           
           if (firebaseUser) {
-            // Para evitar múltiplas consultas ao Firestore, verificamos se já temos os detalhes
-            if (!userDetails || userDetails.id !== firebaseUser.uid) {
-              // Buscar detalhes do perfil no Firestore
-              const userRef = doc(db, 'orbita_usuarios', firebaseUser.uid);
-              const userSnap = await getDoc(userRef);
-              
-              if (userSnap.exists()) {
-                setUserDetails({
-                  ...userSnap.data() as UserDetails,
-                  provider: 'firebase'
-                });
-              } else {
-                // Se não existir no Firestore, criar perfil básico
-                const newUserDetails: UserDetails = {
-                  id: firebaseUser.uid,
-                  nome: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
-                  email: firebaseUser.email || '',
-                  bio: null,
-                  avatar_url: firebaseUser.photoURL,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                  provider: 'firebase'
-                };
-                
-                await setDoc(userRef, newUserDetails);
-                setUserDetails(newUserDetails);
-              }
+            const userRef = doc(db, 'orbita_usuarios', firebaseUser.uid);
+            const userSnap = await getDoc(userRef);
+            
+            if (userSnap.exists()) {
+              setUserDetails({
+                ...userSnap.data() as UserDetails,
+                provider: 'firebase'
+              });
             }
           } else {
             setUserDetails(null);
@@ -119,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         });
         
-        return () => unsubscribe();
+        return () => unsubFirebase();
       }
     } catch (error) {
       console.error("Erro ao inicializar autenticação:", error);
@@ -128,8 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   
   initAuth();
-  
-  // Configurar o listener para Supabase aqui se necessário
 }, [activeProvider]);
 
   const signInWithGoogle = async (provider: AuthProvider = activeProvider) => {
@@ -145,16 +139,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
         return { data, error: null };
       } else {
-        // Firebase Google login
         const result = await signInWithPopup(auth, googleProvider);
         const user = result.user;
-        
-        // Verificar se o usuário já existe no Firestore
+
         const userRef = doc(db, 'orbita_usuarios', user.uid);
         const userSnap = await getDoc(userRef);
         
         if (!userSnap.exists()) {
-          // Criar perfil no Firestore
           const userDetails: UserDetails = {
             id: user.uid,
             nome: user.displayName || user.email?.split('@')[0] || 'Usuário',

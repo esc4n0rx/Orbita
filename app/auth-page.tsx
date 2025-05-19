@@ -20,18 +20,24 @@ export default function AuthPage() {
   const { user, loading, activeProvider, switchProvider } = useAuth();
   const [isPWAInstalled, setIsPWAInstalled] = useState(false);
 
-  useEffect(() => {
+    useEffect(() => {
     const checkIfPWAInstalled = () => {
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+      if (typeof window !== 'undefined') {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
                           (window.navigator as any).standalone === true;
-      setIsPWAInstalled(isStandalone);
+        setIsPWAInstalled(isStandalone);
+      }
     };
     
     checkIfPWAInstalled();
-    
-    if (!loading && user) {
-      console.log("Usuário já autenticado, redirecionando para dashboard");
-      router.push('/dashboard');
+
+    if (!loading) {
+      if (user) {
+        console.log("Usuário autenticado, redirecionando para dashboard");
+        router.push('/dashboard');
+      } else {
+        console.log("Usuário não autenticado, permanecendo na página de login");
+      }
     }
   }, [user, loading, router]);
 
