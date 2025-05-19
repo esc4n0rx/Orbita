@@ -17,7 +17,7 @@ export async function sincronizarUsuarioFirebaseComSupabase(firebaseUser: Fireba
       const customToken = await adminAuth.createCustomToken(firebaseUser.uid);
       
       // Fazer login no Supabase com customToken (isso criará um usuário correspondente)
-      const { error } = await supabase.auth.signInWithCustomToken(customToken);
+      const { error } = await supabase.auth.signInWithIdToken({ provider: 'firebase', token: customToken });
       
       if (error) throw error;
     }

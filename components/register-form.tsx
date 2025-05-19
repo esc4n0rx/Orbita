@@ -42,7 +42,7 @@ export function RegisterForm() {
   const handleGoogleRegister = async () => {
     setLoading(true);
     try {
-      const { error } = await signInWithGoogle('firebase');
+      const { error } = await signInWithGoogle();
       if (error) throw error;
 
       router.push('/dashboard');
@@ -85,43 +85,42 @@ export function RegisterForm() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  e.preventDefault();
 
-    if (!validateForm()) {
-      return
-    }
-
-    setLoading(true);
-    
-    try {
-      const { data, error } = await signUpWithEmail(
-        formData.email, 
-        formData.password, 
-        formData.name
-      );
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Conta criada com sucesso!",
-        description: "Redirecionando para o dashboard...",
-      });
-      
-      router.push('/dashboard');
-    } catch (error) {
-      console.error("Erro ao criar conta:", error);
-      toast({
-        title: "Erro ao criar conta",
-        description: error instanceof Error ? error.message : "Ocorreu um erro ao criar sua conta. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  if (!validateForm()) {
+    return;
   }
 
+  setLoading(true);
+  
+  try {
+    const { data, error } = await signUpWithEmail(
+      formData.email, 
+      formData.password, 
+      formData.name
+    );
+    
+    if (error) {
+      throw error;
+    }
+    
+    toast({
+      title: "Conta criada com sucesso!",
+      description: "Redirecionando para o dashboard...",
+    });
+    
+    router.push('/dashboard');
+  } catch (error) {
+    console.error("Erro ao criar conta:", error);
+    toast({
+      title: "Erro ao criar conta",
+      description: error instanceof Error ? error.message : "Ocorreu um erro ao criar sua conta. Tente novamente.",
+      variant: "destructive",
+    });
+  } finally {
+    setLoading(false);
+  }
+} 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">

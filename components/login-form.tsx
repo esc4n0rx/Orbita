@@ -37,7 +37,7 @@ export function LoginForm() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const { error } = await signInWithGoogle('firebase');
+      const { error } = await signInWithGoogle();
       if (error) throw error;
       
       router.push('/dashboard');
@@ -53,34 +53,34 @@ export function LoginForm() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
+  
+  setLoading(true);
+  
+  try {
+    const { data, error } = await signInWithEmail(formData.email, formData.password);
     
-    setLoading(true);
-    
-    try {
-      const { data, error } = await signInWithEmail(formData.email, formData.password);
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Login realizado com sucesso!",
-        description: "Redirecionando para o dashboard...",
-      });
-      
-      router.push('/dashboard');
-    } catch (error) {
-      console.error("Erro ao fazer login:", error);
-      toast({
-        title: "Erro ao fazer login",
-        description: error instanceof Error ? error.message : "Verifique suas credenciais e tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+    if (error) {
+      throw error;
     }
+    
+    toast({
+      title: "Login realizado com sucesso!",
+      description: "Redirecionando para o dashboard...",
+    });
+    
+    router.push('/dashboard');
+  } catch (error) {
+    console.error("Erro ao fazer login:", error);
+    toast({
+      title: "Erro ao fazer login",
+      description: error instanceof Error ? error.message : "Verifique suas credenciais e tente novamente.",
+      variant: "destructive",
+    });
+  } finally {
+    setLoading(false);
   }
+}
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">

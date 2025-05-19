@@ -1,4 +1,4 @@
-// contexts/auth-context.tsx (atualizado)
+// contexts/auth-context.tsx
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -33,10 +33,10 @@ type AuthContextType = {
   userDetails: UserDetails | null;
   loading: boolean;
   refreshUser: () => Promise<void>;
-  signInWithGoogle: (provider?: AuthProvider) => Promise<{ data: any | null, error: Error | null }>;
-  signInWithEmail: (email: string, password: string, provider?: AuthProvider) => Promise<{ data: any | null, error: Error | null }>;
-  signUpWithEmail: (email: string, password: string, name: string, provider?: AuthProvider) => Promise<{ data: any | null, error: Error | null }>;
-  signOut: (provider?: AuthProvider) => Promise<void>;
+  signInWithGoogle: () => Promise<{ data: any | null, error: Error | null }>;
+  signInWithEmail: (email: string, password: string) => Promise<{ data: any | null, error: Error | null }>;
+  signUpWithEmail: (email: string, password: string, name: string) => Promise<{ data: any | null, error: Error | null }>;
+  signOut: () => Promise<void>;
   activeProvider: AuthProvider;
   switchProvider: (provider: AuthProvider) => void;
 };
@@ -48,13 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | FirebaseUser | null>(null);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [activeProvider, setActiveProvider] = useState<AuthProvider>(() => {
-    if (typeof window !== 'undefined') {
-      const savedProvider = localStorage.getItem('auth_provider');
-      return (savedProvider as AuthProvider) || 'firebase';
-    }
-    return 'supabase'; 
-  });
+  const [activeProvider, setActiveProvider] = useState<AuthProvider>('supabase'); // Supabase como padrão fixo
 
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
@@ -67,173 +61,198 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(safetyTimeout);
   }, [loading]);
 
-
   useEffect(() => {
-  const initAuth = async () => {
-    try {
-      setLoading(true);
-      
-      if (activeProvider === 'supabase') {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        setUser(session?.user || null);
+    const initAuth = async () => {
+      try {
+        setLoading(true);
         
-        if (session?.user) {
-          const { data, error } = await supabase
-            .from('orbita_usuarios')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+        if (activeProvider === 'supabase') {
+          // Inicializar autenticação do Supabase
+          const { data: { session } } = await supabase.auth.getSession();
+          setSession(session);
+          setUser(session?.user || null);
           
-          if (data && !error) {
-            setUserDetails({
-              ...data as UserDetails,
-              provider: 'supabase'
-            });
-          }
-        }
-        
-        setLoading(false);
-      } else {
-        const unsubFirebase = auth.onAuthStateChanged(async (firebaseUser) => {
-          setUser(firebaseUser);
-          
-          if (firebaseUser) {
-            const userRef = doc(db, 'orbita_usuarios', firebaseUser.uid);
-            const userSnap = await getDoc(userRef);
+          if (session?.user) {
+            const { data, error } = await supabase
+              .from('orbita_usuarios')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
             
-            if (userSnap.exists()) {
+            if (data && !error) {
               setUserDetails({
-                ...userSnap.data() as UserDetails,
-                provider: 'firebase'
+                ...data as UserDetails,
+                provider: 'supabase'
               });
             }
-          } else {
-            setUserDetails(null);
           }
           
-          setLoading(false);
-        });
-        
-        return () => unsubFirebase();
-      }
-    } catch (error) {
-      console.error("Erro ao inicializar autenticação:", error);
-      setLoading(false);
-    }
-  };
-  
-  initAuth();
-}, [activeProvider]);
-
-  const signInWithGoogle = async (provider: AuthProvider = activeProvider) => {
-    try {
-      if (provider === 'supabase') {
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: `${window.location.origin}/auth/callback`,
-          },
-        });
-
-        if (error) throw error;
-        return { data, error: null };
-      } else {
-        const result = await signInWithPopup(auth, googleProvider);
-        const user = result.user;
-
-        const userRef = doc(db, 'orbita_usuarios', user.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (!userSnap.exists()) {
-          const userDetails: UserDetails = {
-            id: user.uid,
-            nome: user.displayName || user.email?.split('@')[0] || 'Usuário',
-            email: user.email || '',
-            bio: null,
-            avatar_url: user.photoURL,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            provider: 'firebase'
-          };
+          // Configurar listener para mudanças na autenticação
+          const { data: { subscription } } = await supabase.auth.onAuthStateChange(
+            async (event, newSession) => {
+              setSession(newSession);
+              setUser(newSession?.user || null);
+              
+              if (newSession?.user) {
+                const { data } = await supabase
+                  .from('orbita_usuarios')
+                  .select('*')
+                  .eq('id', newSession.user.id)
+                  .single();
+                
+                if (data) {
+                  setUserDetails({
+                    ...data as UserDetails,
+                    provider: 'supabase'
+                  });
+                }
+              } else {
+                setUserDetails(null);
+              }
+            }
+          );
           
-          await setDoc(userRef, userDetails);
+          setLoading(false);
+          
+          return () => {
+            subscription.unsubscribe();
+          };
+        } else {
+          const unsubFirebase = auth.onAuthStateChanged(async (firebaseUser) => {
+            setUser(firebaseUser);
+            
+            if (firebaseUser) {
+              const userRef = doc(db, 'orbita_usuarios', firebaseUser.uid);
+              const userSnap = await getDoc(userRef);
+              
+              if (userSnap.exists()) {
+                setUserDetails({
+                  ...userSnap.data() as UserDetails,
+                  provider: 'firebase'
+                });
+              }
+            } else {
+              setUserDetails(null);
+            }
+            
+            setLoading(false);
+          });
+          
+          return () => unsubFirebase();
         }
-        
-        return { data: { user }, error: null };
+      } catch (error) {
+        console.error("Erro ao inicializar autenticação:", error);
+        setLoading(false);
       }
+    };
+    
+    initAuth();
+  }, [activeProvider]);
+
+  const signInWithGoogle = async () => {
+    try {
+      // Sempre usa Firebase para login com Google
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      const userRef = doc(db, 'orbita_usuarios', user.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (!userSnap.exists()) {
+        const userDetails: UserDetails = {
+          id: user.uid,
+          nome: user.displayName || user.email?.split('@')[0] || 'Usuário',
+          email: user.email || '',
+          bio: null,
+          avatar_url: user.photoURL,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          provider: 'firebase'
+        };
+        
+        await setDoc(userRef, userDetails);
+      }
+      
+      // Alterar o provedor ativo para Firebase após login com Google
+      setActiveProvider('firebase');
+      
+      return { data: { user }, error: null };
     } catch (error) {
       console.error('Erro ao fazer login com Google:', error);
       return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
   };
 
-  const signInWithEmail = async (email: string, password: string, provider: AuthProvider = activeProvider) => {
+  const signInWithEmail = async (email: string, password: string) => {
     try {
-      if (provider === 'supabase') {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        
-        if (error) throw error;
-        return { data, error: null };
-      } else {
-        // Firebase email login
-        const userCredential = await firebaseSignInWithEmail(auth, email, password);
-        return { data: { user: userCredential.user }, error: null };
-      }
+      // Sempre usar Supabase para login com email/senha
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      
+      return { data, error: null };
     } catch (error) {
       console.error('Erro ao fazer login com email:', error);
       return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
   };
 
-  const signUpWithEmail = async (email: string, password: string, name: string, provider: AuthProvider = activeProvider) => {
+  const signUpWithEmail = async (email: string, password: string, name: string) => {
     try {
-      if (provider === 'supabase') {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              nome: name,
-            },
+      // Sempre usar Supabase para registro com email/senha
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            nome: name,
           },
-        });
+        },
+      });
+      
+      if (error) throw error;
+      
+      // Verificar se o usuário foi criado
+      if (data.user && data.user.id) {
+        // Aguardar um momento para garantir que o usuário foi criado no Auth
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        if (error) throw error;
-        return { data, error: null };
-      } else {
-        // Firebase email signup
-        const userCredential = await firebaseCreateUser(auth, email, password);
-        const user = userCredential.user;
-        
-        // Criar perfil no Firestore
-        const userDetails: UserDetails = {
-          id: user.uid,
-          nome: name,
-          email: user.email || '',
-          bio: null,
-          avatar_url: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          provider: 'firebase'
-        };
-        
-        await setDoc(doc(db, 'orbita_usuarios', user.uid), userDetails);
-        
-        return { data: { user }, error: null };
+        try {
+          // Tentar criar o perfil do usuário
+          const { error: profileError } = await supabase
+            .from('orbita_usuarios')
+            .insert({
+              id: data.user.id,
+              nome: name,
+              email: data.user.email,
+              bio: null,
+              avatar_url: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              provider: 'supabase'
+            });
+            
+          if (profileError) {
+            console.error("Erro ao criar perfil de usuário:", profileError);
+          }
+        } catch (profileError) {
+          console.error("Exceção ao criar perfil de usuário:", profileError);
+        }
       }
+      
+      return { data, error: null };
     } catch (error) {
       console.error('Erro ao criar conta:', error);
       return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
     }
   };
 
-  const signOut = async (provider: AuthProvider = activeProvider) => {
+  const signOut = async () => {
     try {
-      if (provider === 'supabase') {
+      if (activeProvider === 'supabase') {
         await supabase.auth.signOut();
       } else {
         await firebaseSignOut(auth);
@@ -299,7 +318,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const switchProvider = (provider: AuthProvider) => {
     // Fazer logout antes de trocar de provedor
-    signOut(activeProvider).then(() => {
+    signOut().then(() => {
       setActiveProvider(provider);
     });
   };
